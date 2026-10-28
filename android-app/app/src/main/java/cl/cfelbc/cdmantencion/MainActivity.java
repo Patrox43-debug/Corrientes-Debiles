@@ -184,6 +184,8 @@ public class MainActivity extends AppCompatActivity {
         settings.setDatabaseEnabled(true);
         settings.setAllowFileAccess(true);
         settings.setAllowContentAccess(true);
+        settings.setAllowFileAccessFromFileURLs(true);
+        settings.setAllowUniversalAccessFromFileURLs(true);
         settings.setLoadWithOverviewMode(true);
         settings.setUseWideViewPort(true);
         settings.setSupportZoom(false);
@@ -193,8 +195,9 @@ public class MainActivity extends AppCompatActivity {
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
         settings.setMediaPlaybackRequiresUserGesture(false);
 
-        webView.setBackgroundColor(ContextCompat.getColor(this, R.color.app_bg_dark));
-        swipeRefreshLayout.setBackgroundColor(ContextCompat.getColor(this, R.color.app_bg_dark));
+        int blackBg = ContextCompat.getColor(this, R.color.app_bg_dark);
+        webView.setBackgroundColor(blackBg);
+        swipeRefreshLayout.setBackgroundColor(blackBg);
 
         String defaultUa = settings.getUserAgentString();
         settings.setUserAgentString(defaultUa + " CDmantencion_Android_App/1.0");
@@ -210,20 +213,28 @@ public class MainActivity extends AppCompatActivity {
             public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
                 Uri uri = request.getUrl();
                 String path = uri.getPath();
+                if (path == null || path.isEmpty()) path = "/";
 
-                if (path == null || path.equals("/") || path.equals("/index.html")) {
+                String cleanPath = path;
+                if (cleanPath.startsWith("/static/")) {
+                    cleanPath = cleanPath.substring(8);
+                } else if (cleanPath.startsWith("/")) {
+                    cleanPath = cleanPath.substring(1);
+                }
+
+                int qIdx = cleanPath.indexOf('?');
+                if (qIdx != -1) {
+                    cleanPath = cleanPath.substring(0, qIdx);
+                }
+
+                if (cleanPath.isEmpty() || cleanPath.equals("index.html")) {
                     WebResourceResponse resp = getAssetResponse("index.html", "text/html");
                     if (resp != null) return resp;
-                } else if (path.startsWith("/static/")) {
-                    String assetPath = path.substring(1);
-                    int qIdx = assetPath.indexOf('?');
-                    if (qIdx != -1) {
-                        assetPath = assetPath.substring(0, qIdx);
-                    }
-                    String mime = getMimeType(assetPath);
-                    WebResourceResponse response = getAssetResponse(assetPath, mime);
-                    if (response != null) {
-                        return response;
+                } else if (!cleanPath.startsWith("api/")) {
+                    String mime = getMimeType(cleanPath);
+                    WebResourceResponse resp = getAssetResponse(cleanPath, mime);
+                    if (resp != null) {
+                        return resp;
                     }
                 }
 
@@ -248,8 +259,9 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
                 super.onReceivedError(view, request, error);
-                if (request.isForMainFrame() && !request.getUrl().toString().contains("mantencion.cfelbc.cl")) {
-                    showErrorScreen();
+                if (request.isForMainFrame()) {
+                    // Fallback directo a la versión local embebida para funcionamiento 100% offline
+                    view.loadUrl("file:///android_asset/index.html");
                 }
             }
 

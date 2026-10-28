@@ -1,13 +1,13 @@
 <resources>
-    <color name="primary">#0284c7</color>
-    <color name="primary_dark">#0369a1</color>
-    <color name="primary_light">#e0f2fe</color>
-    <color name="accent">#f97316</color>
-    <color name="background">#f8fafc</color>
-    <color name="text_primary">#0f172a</color>
-    <color name="text_secondary">#64748b</color>
+    <color name="primary">#f97316</color>
+    <color name="primary_dark">#ea580c</color>
+    <color name="primary_light">#ffedd5</color>
+    <color name="accent">#ff6a00</color>
+    <color name="background">#09090b</color>
+    <color name="text_primary">#f4f4f5</color>
+    <color name="text_secondary">#a1a1aa</color>
     <color name="white">#ffffff</color>
-    <color name="app_bg_dark">#0b1329</color>
-    <color name="status_bar_dark">#0b1329</color>
-    <color name="ic_launcher_background">#0b1329</color>
+    <color name="app_bg_dark">#09090b</color>
+    <color name="status_bar_dark">#09090b</color>
+    <color name="ic_launcher_background">#09090b</color>
 </resources>

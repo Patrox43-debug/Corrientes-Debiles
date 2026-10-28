@@ -21,12 +21,14 @@
     <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
         android:id="@+id/swipeRefreshLayout"
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
+        android:layout_height="match_parent"
+        android:background="@color/app_bg_dark">
 
         <WebView
             android:id="@+id/webView"
             android:layout_width="match_parent"
-            android:layout_height="match_parent" />
+            android:layout_height="match_parent"
+            android:background="@color/app_bg_dark" />
 
     </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
@@ -38,25 +40,32 @@
         android:orientation="vertical"
         android:gravity="center"
         android:padding="24dp"
-        android:background="@color/background"
+        android:background="@color/app_bg_dark"
         android:visibility="gone">
+
+        <ImageView
+            android:layout_width="88dp"
+            android:layout_height="88dp"
+            android:src="@drawable/ic_launcher"
+            android:contentDescription="CDmantencion Logo"
+            android:layout_marginBottom="16dp" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="⚡ CDmantencion"
+            android:text="CDmantencion"
             android:textColor="@color/primary"
-            android:textSize="26sp"
+            android:textSize="24sp"
             android:textStyle="bold"
             android:gravity="center"
-            android:layout_marginBottom="16dp" />
+            android:layout_marginBottom="8dp" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/error_connection"
             android:textColor="@color/text_primary"
-            android:textSize="20sp"
+            android:textSize="18sp"
             android:textStyle="bold"
             android:gravity="center"
             android:layout_marginBottom="8dp" />

@@ -293,6 +293,8 @@ def test_suite():
     try:
         resp = opener.open(f"{base_url}/CDmantencion.apk")
         assert resp.status in (200, 302)
+        resp.read()
+        resp.close()
     except urllib.error.HTTPError as e:
         assert e.code == 302
         assert "releases" in e.headers.get("Location", "")
