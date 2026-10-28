@@ -12,6 +12,15 @@ __pycache__/
 *.sqlite3
 database/inventario.db
 
+# Android build outputs & local configs
+android-app/.gradle/
+android-app/build/
+android-app/*/build/
+android-app/local.properties
+*.apk
+*.ap_
+*.dex
+
 # Secrets & Environment
 .env
 .env.local

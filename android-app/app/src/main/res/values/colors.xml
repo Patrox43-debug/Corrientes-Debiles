@@ -1,0 +1,13 @@
+<resources>
+    <color name="primary">#0284c7</color>
+    <color name="primary_dark">#0369a1</color>
+    <color name="primary_light">#e0f2fe</color>
+    <color name="accent">#f97316</color>
+    <color name="background">#f8fafc</color>
+    <color name="text_primary">#0f172a</color>
+    <color name="text_secondary">#64748b</color>
+    <color name="white">#ffffff</color>
+    <color name="app_bg_dark">#0b1329</color>
+    <color name="status_bar_dark">#0b1329</color>
+    <color name="ic_launcher_background">#0b1329</color>
+</resources>

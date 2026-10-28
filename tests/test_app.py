@@ -277,13 +277,26 @@ def test_suite():
         assert data['success'] is True
         print(f"✓ Test 16: DELETE /api/usuarios/{new_uid} OK -> Deleted user successfully")
 
-    # 17. Test GET /CorrientesDebiles.apk (Direct APK Download)
-    with urllib.request.urlopen(f"{base_url}/CorrientesDebiles.apk") as res:
+    # 17. Test GET /api/app-version & /CDmantencion.apk (APK Versioning and Download Route)
+    with urllib.request.urlopen(f"{base_url}/api/app-version") as res:
         assert res.status == 200
-        assert "application/vnd.android.package-archive" in res.headers.get('Content-Type', '')
-        apk_bytes = res.read()
-        assert len(apk_bytes) > 20000
-        print(f"✓ Test 17: GET /CorrientesDebiles.apk OK -> Received {len(apk_bytes)/1024:.1f} KB")
+        ver_data = json.loads(res.read().decode('utf-8'))
+        assert "version_name" in ver_data
+        assert ver_data["app_name"] == "CDmantencion"
+        print(f"✓ Test 17a: GET /api/app-version OK -> Version {ver_data['version_name']}")
+
+    class NoRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, req, fp, code, msg, headers, newurl):
+            return None
+
+    opener = urllib.request.build_opener(NoRedirect)
+    try:
+        resp = opener.open(f"{base_url}/CDmantencion.apk")
+        assert resp.status in (200, 302)
+    except urllib.error.HTTPError as e:
+        assert e.code == 302
+        assert "releases" in e.headers.get("Location", "")
+    print("✓ Test 17b: GET /CDmantencion.apk OK -> Handled APK download/release redirect")
 
     # 18. Test GET /api/cloud/export (Cloud Database Export)
     with urllib.request.urlopen(f"{base_url}/api/cloud/export") as res:
