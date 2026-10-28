@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  corrientes-debiles:
+    build: .
+    container_name: corrientes-debiles
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8080}:8080"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PORT=8080
+      - HOST=0.0.0.0
+      - APP_URL=https://mantencion.cfelbc.cl
+      - COOLIFY_FQDN=https://mantencion.cfelbc.cl
+      - DB_PATH=/app/data/inventario.db
+    volumes:
+      - mantencion_data:/app/data
+    labels:
+      - "coolify.managed=true"
+      - "traefik.enable=true"
+      - "traefik.http.routers.mantencion.rule=Host(`mantencion.cfelbc.cl`)"
+      - "traefik.http.routers.mantencion.entrypoints=https"
+      - "traefik.http.routers.mantencion.tls=true"
+      - "traefik.http.routers.mantencion.tls.certresolver=letsencrypt"
+      - "traefik.http.services.mantencion.loadbalancer.server.port=8080"
+
+volumes:
+  mantencion_data:
+    driver: local

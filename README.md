@@ -92,6 +92,28 @@ Luego abre tu navegador en:
 
 ---
 
+## ☁️ Despliegue en Producción con Coolify
+
+La aplicación está lista para desplegarse directamente en **Coolify** bajo el dominio oficial:
+👉 **`https://mantencion.cfelbc.cl`**
+
+### Pasos de Configuración en Coolify:
+1. **Conectar Repositorio**: En el panel de Coolify, crea un nuevo recurso tipo **Application** apuntando al repositorio de GitHub: `Patrox43-debug/Corrientes-Debiles`.
+2. **Dominio Asignado (FQDN)**: Configura el dominio:
+   ```text
+   https://mantencion.cfelbc.cl
+   ```
+3. **Build Pack**: Selecciona **`Dockerfile`** o **`Docker Compose`** (ambos esquemas se encuentran configurados en la raíz).
+4. **Puerto Expuesto**: Configura el puerto del contenedor en **`8080`**.
+5. **Verificación de Salud (Health Check)**:
+   - Ruta: `/api/health`
+6. **Almacenamiento Persistente (Persistent Volume / Storage)**:
+   - Destino en contenedor: `/app/data`
+   - Variable de entorno: `DB_PATH=/app/data/inventario.db`
+   *(Garantiza la persistencia permanente de la base de datos SQLite entre despliegues y reinicios).*
+
+---
+
 ## 🧪 Pruebas Automatizadas
 Para ejecutar la suite de pruebas unitarias e integración de la API y base de datos:
 ```bash

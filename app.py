@@ -15,7 +15,9 @@ from datetime import datetime
 
 from database import db
 
-PORT = 8080
+PORT = int(os.environ.get('PORT', 8080))
+HOST = os.environ.get('HOST', '0.0.0.0')
+APP_URL = os.environ.get('APP_URL', 'https://mantencion.cfelbc.cl')
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(BASE_DIR, 'static')
 
@@ -347,17 +349,18 @@ class CustomRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         return self.send_json({"error": "Endpoint not found"}, status=404)
 
-def run_server(port=PORT):
+def run_server(host=HOST, port=PORT):
     # Ensure database is initialized
     db.init_db()
 
     # Reuse address
     socketserver.TCPServer.allow_reuse_address = True
-    with socketserver.TCPServer(("", port), CustomRequestHandler) as httpd:
+    with socketserver.TCPServer((host, port), CustomRequestHandler) as httpd:
         print(f"==================================================")
         print(f"  ⚡ CORRIENTES DÉBILES - GESTOR DE EQUIPAMIENTOS")
         print(f"  Estilo Minimalista: Naranjo & Negro")
-        print(f"  Servidor activo en: http://localhost:{port}")
+        print(f"  Dominio oficial: {APP_URL}")
+        print(f"  Servidor activo en: http://{host if host != '0.0.0.0' else 'localhost'}:{port}")
         print(f"  Presione Ctrl+C para detener")
         print(f"==================================================")
         try:

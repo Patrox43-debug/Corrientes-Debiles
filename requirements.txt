@@ -1,0 +1,2 @@
+# Corrientes Débiles utiliza la biblioteca estándar de Python 3 (http.server, sqlite3, urllib, json, hashlib)
+# Cero dependencias externas requeridas para una ejecución ultraligera y segura

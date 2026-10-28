@@ -599,7 +599,7 @@ class AppStorageManager {
         if (typeof window !== 'undefined' && window.location && window.location.protocol.startsWith('http')) {
             return window.location.origin;
         }
-        return 'http://localhost:8080';
+        return 'https://mantencion.cfelbc.cl';
     }
 
     setCloudUrl(url) {
