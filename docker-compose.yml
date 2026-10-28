@@ -5,8 +5,8 @@ services:
     build: .
     container_name: corrientes-debiles
     restart: unless-stopped
-    ports:
-      - "${PORT:-8080}:8080"
+    expose:
+      - "8080"
     environment:
       - PYTHONUNBUFFERED=1
       - PORT=8080
