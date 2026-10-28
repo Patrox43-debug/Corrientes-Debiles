@@ -378,9 +378,11 @@ class AppController {
             const totalEl = document.getElementById('stat-total-equipos');
             const operEl = document.getElementById('stat-operativos');
             const mantEl = document.getElementById('stat-en-mantencion');
+            const fdsEl = document.getElementById('stat-fuera-servicio');
             if (totalEl) totalEl.textContent = s.total_equipos;
             if (operEl) operEl.textContent = s.operativos;
             if (mantEl) mantEl.textContent = s.en_mantencion;
+            if (fdsEl) fdsEl.textContent = s.otros_estados !== undefined ? s.otros_estados : (s.criticos || 0);
             return;
         }
 
@@ -393,9 +395,11 @@ class AppController {
                 const totalEl = document.getElementById('stat-total-equipos');
                 const operEl = document.getElementById('stat-operativos');
                 const mantEl = document.getElementById('stat-en-mantencion');
+                const fdsEl = document.getElementById('stat-fuera-servicio');
                 if (totalEl) totalEl.textContent = s.total_equipos;
                 if (operEl) operEl.textContent = s.operativos;
                 if (mantEl) mantEl.textContent = s.en_mantencion;
+                if (fdsEl) fdsEl.textContent = s.otros_estados !== undefined ? s.otros_estados : (s.criticos || 0);
             }
         } catch (e) {
             console.error('Error fetching stats from cloud', e);
@@ -543,6 +547,24 @@ class AppController {
                             ${this.escapeHtml(eq.ubicacion || 'General')}
                         </div>
 
+                        <div style="display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.75rem; align-items: center;">
+                            ${eq.capacidad && eq.capacidad !== 'S/I' ? `
+                                <span style="font-size: 0.72rem; font-family: var(--font-mono); font-weight: 700; color: var(--orange-primary); background: rgba(255, 107, 0, 0.12); padding: 2px 7px; border-radius: 4px; border: 1px solid rgba(255, 107, 0, 0.3);">
+                                    ${this.escapeHtml(eq.capacidad)}
+                                </span>
+                            ` : ''}
+                            ${eq.numero_serie && eq.numero_serie !== 'S/I' && !eq.numero_serie.includes('No instalada') ? `
+                                <span style="font-size: 0.72rem; font-family: var(--font-mono); color: var(--text-muted); background: var(--bg-surface-2); padding: 2px 7px; border-radius: 4px; border: 1px solid var(--border-subtle);" title="Número de Serie">
+                                    S/N: ${this.escapeHtml(eq.numero_serie)}
+                                </span>
+                            ` : ''}
+                            ${eq.baterias_cambiadas === 'Sí' ? `
+                                <span style="font-size: 0.7rem; color: var(--status-operativo); background: rgba(34, 197, 94, 0.12); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(34, 197, 94, 0.3);">
+                                    ✓ Baterías OK
+                                </span>
+                            ` : ''}
+                        </div>
+
                         <div style="margin-bottom: 0.85rem;">
                             <div class="equipo-hours-badge" title="Horas de trabajo dedicadas a este equipo">
                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -621,6 +643,14 @@ class AppController {
                     <td>
                         <span class="td-main-title">${this.escapeHtml(eq.nombre)}</span>
                         <span class="td-sub-info">${this.escapeHtml(eq.ubicacion || 'General')}</span>
+                        <div style="display: flex; gap: 0.35rem; align-items: center; margin-top: 2px;">
+                            ${eq.numero_serie && eq.numero_serie !== 'S/I' && !eq.numero_serie.includes('No instalada') ? `
+                                <span style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-muted);">S/N: ${this.escapeHtml(eq.numero_serie)}</span>
+                            ` : ''}
+                            ${eq.baterias_cambiadas === 'Sí' ? `
+                                <span style="font-size: 0.68rem; color: var(--status-operativo); font-weight: 600;">✓ Bat. OK</span>
+                            ` : ''}
+                        </div>
                     </td>
                     <td>
                         <strong style="color: var(--orange-primary);">${this.escapeHtml(eq.marca)}</strong>
@@ -865,6 +895,27 @@ class AppController {
                         Recinto: <strong>${this.escapeHtml(eq.ubicacion || 'General')}</strong>
                     </div>
                 </div>
+            </div>
+
+            <!-- UPS Detailed Levantamiento Box -->
+            <div style="background: var(--bg-surface-2); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 0.85rem; margin-bottom: 1.25rem;">
+                <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--orange-primary); font-weight: 700; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between;">
+                    <span>Datos de Levantamiento UPS (Inventario Oficial)</span>
+                    <span style="font-family: var(--font-mono); font-size: 0.75rem; color: #fff;">${this.escapeHtml(eq.codigo_qr)}</span>
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); gap: 0.65rem; font-size: 0.8rem;">
+                    <div><span style="color: var(--text-muted);">Piso:</span> <strong style="color: #fff;">${this.escapeHtml(eq.piso || '-')}</strong></div>
+                    <div><span style="color: var(--text-muted);">Sector:</span> <strong style="color: #fff;">${this.escapeHtml(eq.sector || '-')}</strong></div>
+                    <div><span style="color: var(--text-muted);">Recinto:</span> <strong style="color: #fff;">${this.escapeHtml(eq.recinto || '-')}</strong></div>
+                    <div><span style="color: var(--text-muted);">Capacidad:</span> <strong style="color: var(--orange-primary); font-family: var(--font-mono);">${this.escapeHtml(eq.capacidad || '-')}</strong></div>
+                    <div><span style="color: var(--text-muted);">N° de Serie:</span> <strong style="color: #fff; font-family: var(--font-mono);">${this.escapeHtml(eq.numero_serie || 'S/I')}</strong></div>
+                    <div><span style="color: var(--text-muted);">Baterías Cambiadas:</span> <strong style="color: ${eq.baterias_cambiadas === 'Sí' ? 'var(--status-operativo)' : '#fff'};">${this.escapeHtml(eq.baterias_cambiadas || '-')}</strong></div>
+                </div>
+                ${eq.observaciones && eq.observaciones !== '-' ? `
+                    <div style="margin-top: 0.55rem; padding-top: 0.55rem; border-top: 1px dashed var(--border-subtle); font-size: 0.78rem;">
+                        <span style="color: var(--text-muted); font-weight: 600;">Observaciones de Registro:</span> <span style="color: var(--text-secondary);">${this.escapeHtml(eq.observaciones)}</span>
+                    </div>
+                ` : ''}
             </div>
 
             <!-- Technical Specifications Box -->

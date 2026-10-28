@@ -3,6 +3,14 @@ import os
 import hashlib
 from datetime import datetime
 
+try:
+    from database.seed_data import SEED_EQUIPOS, SEED_MANTENCIONES
+except ImportError:
+    try:
+        from .seed_data import SEED_EQUIPOS, SEED_MANTENCIONES
+    except ImportError:
+        from seed_data import SEED_EQUIPOS, SEED_MANTENCIONES
+
 DB_PATH = os.environ.get('DB_PATH', os.path.join(os.path.dirname(__file__), 'inventario.db'))
 
 def get_connection():
@@ -56,6 +64,13 @@ def init_db():
         caracteristicas TEXT NOT NULL,
         estado TEXT NOT NULL DEFAULT 'Operativo',
         ubicacion TEXT NOT NULL,
+        piso TEXT,
+        sector TEXT,
+        recinto TEXT,
+        numero_serie TEXT,
+        capacidad TEXT,
+        baterias_cambiadas TEXT,
+        observaciones TEXT,
         creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         actualizado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
@@ -75,133 +90,53 @@ def init_db():
     )
     """)
 
-    # Migration: Ensure horas_trabajo exists in equipos
+    # Migration: Ensure all columns exist in equipos
     cursor.execute("PRAGMA table_info(equipos)")
     columns = [row[1] for row in cursor.fetchall()]
-    if 'horas_trabajo' not in columns:
-        cursor.execute("ALTER TABLE equipos ADD COLUMN horas_trabajo REAL NOT NULL DEFAULT 0.0")
+    new_cols = [
+        ('horas_trabajo', 'REAL NOT NULL DEFAULT 0.0'),
+        ('piso', 'TEXT'),
+        ('sector', 'TEXT'),
+        ('recinto', 'TEXT'),
+        ('numero_serie', 'TEXT'),
+        ('capacidad', 'TEXT'),
+        ('baterias_cambiadas', 'TEXT'),
+        ('observaciones', 'TEXT'),
+    ]
+    for col_name, col_def in new_cols:
+        if col_name not in columns:
+            cursor.execute(f"ALTER TABLE equipos ADD COLUMN {col_name} {col_def}")
 
     conn.commit()
 
-    # Seed equipment if not exists (no default credentials stored)
+    # Seed equipment if not exists
     cursor.execute("SELECT COUNT(*) FROM equipos")
     if cursor.fetchone()[0] == 0:
-        seed_equipos = [
-            (
-                "EQ-CCTV-001",
-                "Cámara IP Domo PTZ Perimetral 4K",
-                "Dahua Technology",
-                "DH-SD49425XB-HNR",
-                "2024-03-15",
-                "Sensor 1/2.8\" CMOS 4MP | Zoom Óptico 25x | Visión IR 100m Smart IR | Soporta PoE+ (802.3at) | Protección IP66 & IK10 | Compresión H.265+ | Analíticas avanzadas de IA (Cruce perimetral, Detección humana/vehicular)",
-                "Operativo",
-                "Acceso Perimetral Sur - Poste 4"
-            ),
-            (
-                "EQ-NVR-002",
-                "Grabador Digital NVR 32 Canales 4K",
-                "Hikvision",
-                "DS-7732NI-I4/16P",
-                "2023-11-20",
-                "32 Canales IP hasta 12MP | 4 Bahías SATA (32TB instalados en RAID 5) | Ancho de banda entrante 256 Mbps | 16 Puertos PoE integrados 802.3af/at | Salida HDMI 4K independiente | Doble interfaz LAN Gigabit redundante | Decodificación H.265+",
-                "Operativo",
-                "Sala de Racks Central - U14"
-            ),
-            (
-                "EQ-NET-003",
-                "Switch Gestionable PoE+ 24 Puertos L2+",
-                "Cisco",
-                "CBS350-24P-4G",
-                "2024-01-10",
-                "24 Puertos 10/100/1000 Mbps PoE+ (Presupuesto 195W) | 4 Puertos SFP Gigabit Fibra | Capacidad de conmutación 56 Gbps | Enrutamiento estático IPv4/IPv6 L3 | VLAN 802.1Q | Soporte Spanning Tree RSTP/MSTP | Interfaz Web y CLI SSH",
-                "Operativo",
-                "Rack Distribución Telecomunicaciones - Piso 1"
-            ),
-            (
-                "EQ-INC-004",
-                "Central de Detección de Incendio Direccionable",
-                "Notifier by Honeywell",
-                "NFS2-640",
-                "2023-08-05",
-                "2 Lazos SLC direccionables (hasta 636 puntos) | Protocolo FlashScan alta velocidad | Pantalla LCD retroiluminada de 80 caracteres | Baterías de respaldo 2x 12V 18Ah con cargador supervisado | 4 Circuitos de notificación NACs Clase A/B | Certificado UL/NFPA 72",
-                "Operativo",
-                "Conserjería Central / Sala de Control y Monitoreo"
-            ),
-            (
-                "EQ-ACC-005",
-                "Panel de Control de Acceso IP 4 Puertas",
-                "ZKTeco",
-                "InBio-460 Pro",
-                "2024-04-02",
-                "Controlador para 4 puertas / 8 lectores (RS485 y Wiegand 26/34) | Capacidad 20.000 huellas y 100.000 tarjetas RFID | Comunicación TCP/IP encriptada TLS | 4 Relés auxiliares + 4 Relés de cerrojo magnético | Puerto batería de respaldo 12V 7Ah",
-                "En Mantención",
-                "Tablero Eléctrico Acceso - Subterráneo Nivel -1"
-            ),
-            (
-                "EQ-UPS-006",
-                "Sistema UPS Online Doble Conversión 3kVA",
-                "APC by Schneider Electric",
-                "Smart-UPS On-Line SRT3000XLI",
-                "2023-05-10",
-                "Topología Doble Conversión Online de Onda Senoidal Pura | Capacidad 3000VA / 2700W | Factor de potencia 0.9 | Tarjeta de red y monitoreo remoto SNMP NMC3 | Display gráfico LCD interactivo | Banco interno de baterías 96V DC | Bypass estático automático y manual",
-                "Operativo",
-                "Rack Servidores Principal - Espacio U1 a U4"
-            )
-        ]
-
-        cursor.executemany(
-            """INSERT INTO equipos 
-               (codigo_qr, nombre, marca, modelo, fecha_instalacion, caracteristicas, estado, ubicacion)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-            seed_equipos
-        )
+        for eq in SEED_EQUIPOS:
+            cursor.execute("""
+                INSERT INTO equipos 
+                (id, codigo_qr, nombre, marca, modelo, fecha_instalacion, horas_trabajo, caracteristicas, estado, ubicacion, piso, sector, recinto, numero_serie, capacidad, baterias_cambiadas, observaciones, creado_en, actualizado_en)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                eq.get('id'), eq['codigo_qr'], eq['nombre'], eq['marca'], eq['modelo'], eq['fecha_instalacion'],
+                eq.get('horas_trabajo', 0.0), eq.get('caracteristicas', ''), eq.get('estado', 'Operativo'),
+                eq.get('ubicacion', 'General'), eq.get('piso'), eq.get('sector'), eq.get('recinto'),
+                eq.get('numero_serie'), eq.get('capacidad'), eq.get('baterias_cambiadas'), eq.get('observaciones'),
+                eq.get('creado_en', datetime.now().strftime('%Y-%m-%d %H:%M:%S')),
+                eq.get('actualizado_en', datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            ))
         conn.commit()
 
-        # Seed maintenance logs
-        seed_mantenciones = [
-            # EQ 1 (CCTV)
-            (1, "2024-08-10", "Carlos Valenzuela", 2.0, "Preventiva",
-             "Limpieza profunda de cúpula óptica y ajuste de sellos perimetrales. Verificación de movimiento Pan/Tilt en sus 360 grados y chequeo de iluminación IR nocturna."),
-            (1, "2026-05-18", "Matías Henríquez", 3.5, "Preventiva",
-             "Actualización de firmware de cámara a versión v3.12. Recalibración del preset de auto-enfoque y reapriete de herrajes en soporte de montaje exterior."),
-
-            # EQ 2 (NVR)
-            (2, "2024-04-12", "Andrés Morales", 2.5, "Preventiva",
-             "Inspección de temperaturas internas de gabinete y discos. Limpieza de filtros antipolvo de ventiladores de fuente redundante y chequeo de sincronización horaria NTP."),
-            (2, "2026-07-22", "Rodrigo Espinoza", 4.0, "Correctiva",
-             "Sustitución de disco HDD bahía #3 por advertencia de sectores reasignados S.M.A.R.T. Reconstrucción exitosa de volumen RAID 5 y respaldo completo de perfiles de grabación."),
-
-            # EQ 3 (Switch)
-            (3, "2024-07-15", "Carlos Valenzuela", 1.5, "Preventiva",
-             "Revisión de tablas MAC y puertos PoE. Medición de temperatura ambiente en rack de distribución."),
-            (3, "2026-09-05", "Carlos Valenzuela", 2.0, "Preventiva",
-             "Comprobación de potencias ópticas en módulos SFP de fibra monomodo (Piso 1 hacia Data Center). Test de consumo en vatios por puerto PoE de cámaras conectadas."),
-
-            # EQ 4 (Incendio)
-            (4, "2024-02-14", "Gabriel Soto", 4.0, "Preventiva",
-             "Inspección de lazos SLC 1 y 2 con simulador de humo aerosol. Comprobación de tensión de flotación de baterías 12V 18Ah."),
-            (4, "2026-08-30", "Matías Henríquez", 3.0, "Preventiva",
-             "Prueba general de estroboscópicas y sirenas audibles. Reemplazo preventivo reglamentario del banco de 2 baterías de respaldo de 12V 18Ah."),
-
-            # EQ 5 (Acceso)
-            (5, "2026-06-14", "Andrés Morales", 2.0, "Correctiva",
-             "Ajuste de temporizador de cierre en puerta de torniquetes. Corrección de falso contacto en sensor magnético reed switch de puerta #2."),
-            (5, "2026-10-15", "Carlos Valenzuela", 3.0, "Correctiva",
-             "Diagnóstico de fallo en relé de salida #3 (Puerta Emergencia Poniente). Se programa cambio de tarjeta de relés auxiliar. Estado temporal: En Mantención."),
-
-            # EQ 6 (UPS)
-            (6, "2024-05-15", "Gabriel Soto", 2.0, "Preventiva",
-             "Prueba de descarga controlada en modo batería durante 15 minutos con carga de 1.8kW. Verificación de alarmas por interfaz de red SNMP."),
-            (6, "2026-10-02", "Carlos Valenzuela", 2.5, "Preventiva",
-             "Termografía infrarroja en terminales de entrada/salida AC. Medición de impedancia interna en celdas de batería de 96V DC y comprobación de conmutación limpia a bypass.")
-        ]
-
-        cursor.executemany(
-            """INSERT INTO mantenciones 
-               (equipo_id, fecha_mantencion, nombre_tecnico, horas_trabajo, tipo_mantencion, observaciones)
-               VALUES (?, ?, ?, ?, ?, ?)""",
-            seed_mantenciones
-        )
+        for m in SEED_MANTENCIONES:
+            cursor.execute("""
+                INSERT INTO mantenciones 
+                (id, equipo_id, fecha_mantencion, nombre_tecnico, horas_trabajo, tipo_mantencion, observaciones, creado_en)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                m.get('id'), m['equipo_id'], m['fecha_mantencion'], m['nombre_tecnico'],
+                m.get('horas_trabajo', 2.0), m.get('tipo_mantencion', 'Preventiva'),
+                m.get('observaciones', ''), m.get('creado_en', datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            ))
         conn.commit()
 
     # Synchronize horas_trabajo on equipos if it is 0
@@ -394,12 +329,16 @@ def get_all_equipos(search_query=None, estado=None, marca=None, sort_by=None):
             e.codigo_qr LIKE ? OR 
             e.caracteristicas LIKE ? OR
             e.ubicacion LIKE ? OR
+            COALESCE(e.numero_serie, '') LIKE ? OR
+            COALESCE(e.recinto, '') LIKE ? OR
+            COALESCE(e.piso, '') LIKE ? OR
+            COALESCE(e.sector, '') LIKE ? OR
             EXISTS (
                 SELECT 1 FROM mantenciones sm 
                 WHERE sm.equipo_id = e.id AND (sm.nombre_tecnico LIKE ? OR sm.observaciones LIKE ?)
             )
         )"""
-        params.extend([search_term] * 8)
+        params.extend([search_term] * 12)
 
     if estado and estado != 'Todos':
         query += " AND e.estado = ?"
@@ -497,7 +436,11 @@ def get_equipo_by_id(equipo_id: int):
 def get_equipo_by_code(codigo_qr: str):
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT id FROM equipos WHERE codigo_qr = ? OR LOWER(codigo_qr) = LOWER(?)", (codigo_qr, codigo_qr))
+    cursor.execute("""
+        SELECT id FROM equipos 
+        WHERE codigo_qr = ? OR LOWER(codigo_qr) = LOWER(?)
+           OR numero_serie = ? OR LOWER(numero_serie) = LOWER(?)
+    """, (codigo_qr, codigo_qr, codigo_qr, codigo_qr))
     row = cursor.fetchone()
     conn.close()
     if row:
@@ -513,14 +456,14 @@ def create_equipo(data: dict):
     if not codigo_qr:
         cursor.execute("SELECT MAX(id) FROM equipos")
         max_id = cursor.fetchone()[0] or 0
-        codigo_qr = f"EQ-{datetime.now().strftime('%Y')}-{max_id + 1:04d}"
+        codigo_qr = f"EQ-UPS-{max_id + 1:03d}"
 
     horas_trabajo = float(data.get('horas_trabajo', 0.0) or 0.0)
 
     cursor.execute("""
         INSERT INTO equipos 
-        (codigo_qr, nombre, marca, modelo, fecha_instalacion, horas_trabajo, caracteristicas, estado, ubicacion)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (codigo_qr, nombre, marca, modelo, fecha_instalacion, horas_trabajo, caracteristicas, estado, ubicacion, piso, sector, recinto, numero_serie, capacidad, baterias_cambiadas, observaciones)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         codigo_qr,
         data['nombre'].strip(),
@@ -530,7 +473,14 @@ def create_equipo(data: dict):
         horas_trabajo,
         data.get('caracteristicas', '').strip(),
         data.get('estado', 'Operativo'),
-        data.get('ubicacion', 'General').strip()
+        data.get('ubicacion', 'General').strip(),
+        data.get('piso', '').strip() if data.get('piso') else None,
+        data.get('sector', '').strip() if data.get('sector') else None,
+        data.get('recinto', '').strip() if data.get('recinto') else None,
+        data.get('numero_serie', '').strip() if data.get('numero_serie') else None,
+        data.get('capacidad', '').strip() if data.get('capacidad') else None,
+        data.get('baterias_cambiadas', '').strip() if data.get('baterias_cambiadas') else None,
+        data.get('observaciones', '').strip() if data.get('observaciones') else None
     ))
     equipo_id = cursor.lastrowid
     conn.commit()
@@ -574,6 +524,13 @@ def update_equipo(equipo_id: int, data: dict):
             caracteristicas = ?,
             estado = ?,
             ubicacion = ?,
+            piso = COALESCE(?, piso),
+            sector = COALESCE(?, sector),
+            recinto = COALESCE(?, recinto),
+            numero_serie = COALESCE(?, numero_serie),
+            capacidad = COALESCE(?, capacidad),
+            baterias_cambiadas = COALESCE(?, baterias_cambiadas),
+            observaciones = COALESCE(?, observaciones),
             actualizado_en = CURRENT_TIMESTAMP
         WHERE id = ?
     """, (
@@ -585,6 +542,13 @@ def update_equipo(equipo_id: int, data: dict):
         data.get('caracteristicas', '').strip(),
         data.get('estado', 'Operativo'),
         data.get('ubicacion', 'General').strip(),
+        data.get('piso'),
+        data.get('sector'),
+        data.get('recinto'),
+        data.get('numero_serie'),
+        data.get('capacidad'),
+        data.get('baterias_cambiadas'),
+        data.get('observaciones'),
         equipo_id
     ))
     conn.commit()
@@ -671,22 +635,34 @@ def import_database_data(data: dict):
                     caracteristicas = ?,
                     estado = ?,
                     ubicacion = ?,
+                    piso = COALESCE(?, piso),
+                    sector = COALESCE(?, sector),
+                    recinto = COALESCE(?, recinto),
+                    numero_serie = COALESCE(?, numero_serie),
+                    capacidad = COALESCE(?, capacidad),
+                    baterias_cambiadas = COALESCE(?, baterias_cambiadas),
+                    observaciones = COALESCE(?, observaciones),
                     actualizado_en = CURRENT_TIMESTAMP
                 WHERE id = ?
             """, (
                 eq['nombre'], eq['marca'], eq['modelo'], eq['fecha_instalacion'],
                 horas, eq.get('caracteristicas', ''), eq.get('estado', 'Operativo'),
-                eq.get('ubicacion', 'General'), row[0]
+                eq.get('ubicacion', 'General'),
+                eq.get('piso'), eq.get('sector'), eq.get('recinto'),
+                eq.get('numero_serie'), eq.get('capacidad'), eq.get('baterias_cambiadas'), eq.get('observaciones'),
+                row[0]
             ))
         else:
             cursor.execute("""
                 INSERT INTO equipos 
-                (codigo_qr, nombre, marca, modelo, fecha_instalacion, horas_trabajo, caracteristicas, estado, ubicacion)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (codigo_qr, nombre, marca, modelo, fecha_instalacion, horas_trabajo, caracteristicas, estado, ubicacion, piso, sector, recinto, numero_serie, capacidad, baterias_cambiadas, observaciones)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 eq.get('codigo_qr'), eq['nombre'], eq['marca'], eq['modelo'],
                 eq['fecha_instalacion'], horas, eq.get('caracteristicas', ''),
-                eq.get('estado', 'Operativo'), eq.get('ubicacion', 'General')
+                eq.get('estado', 'Operativo'), eq.get('ubicacion', 'General'),
+                eq.get('piso'), eq.get('sector'), eq.get('recinto'),
+                eq.get('numero_serie'), eq.get('capacidad'), eq.get('baterias_cambiadas'), eq.get('observaciones')
             ))
 
     # Import mantenciones

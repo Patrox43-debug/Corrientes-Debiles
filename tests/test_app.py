@@ -119,15 +119,15 @@ def test_suite():
         assert e.code == 401
         print("✓ Test 7: POST /api/login (Invalid rejection) OK")
 
-    # 8. Test GET /api/equipos/qr/EQ-CCTV-001
-    with urllib.request.urlopen(f"{base_url}/api/equipos/qr/EQ-CCTV-001") as res:
+    # 8. Test GET /api/equipos/qr/EQ-UPS-001
+    with urllib.request.urlopen(f"{base_url}/api/equipos/qr/EQ-UPS-001") as res:
         assert res.status == 200
         data = json.loads(res.read().decode('utf-8'))
         assert data['success'] is True
         eq = data['equipo']
-        assert eq['codigo_qr'] == 'EQ-CCTV-001'
-        assert len(eq['mantenciones']) >= 2
-        print(f"✓ Test 8: GET /api/equipos/qr/EQ-CCTV-001 OK -> {eq['nombre']} ({len(eq['mantenciones'])} mantenciones)")
+        assert eq['codigo_qr'] == 'EQ-UPS-001'
+        assert len(eq['mantenciones']) >= 1
+        print(f"✓ Test 8: GET /api/equipos/qr/EQ-UPS-001 OK -> {eq['nombre']} ({len(eq['mantenciones'])} mantenciones)")
 
     # 9. Test POST /api/mantenciones (Add maintenance record without technician hours)
     mant_payload = json.dumps({
@@ -335,6 +335,18 @@ def test_suite():
         data = json.loads(res.read().decode('utf-8'))
         assert data['success'] is True
         print("✓ Test 19: POST /api/cloud/sync OK -> Sync accepted")
+
+    # Clean up sync test item and test maintenance
+    try:
+        import sqlite3
+        conn = sqlite3.connect('database/inventario.db')
+        c = conn.cursor()
+        c.execute("DELETE FROM equipos WHERE codigo_qr LIKE '%TEST%'")
+        c.execute("DELETE FROM mantenciones WHERE observaciones LIKE '%prueba automatizada%'")
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
 
     print("\n🎉 ALL 19 TESTS PASSED SUCCESSFULLY!")
 
