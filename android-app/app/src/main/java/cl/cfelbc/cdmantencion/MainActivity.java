@@ -83,6 +83,7 @@ public class MainActivity extends AppCompatActivity {
 
     private ActivityResultLauncher<Intent> fileChooserLauncher;
     private ActivityResultLauncher<String[]> permissionsLauncher;
+    private ActivityResultLauncher<String> cameraPermissionLauncher;
     private ActivityResultLauncher<Intent> manageUnknownSourcesLauncher;
     private File pendingInstallApk = null;
     private PermissionRequest currentPermissionRequest;
@@ -133,6 +134,18 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void setupLaunchers() {
+        cameraPermissionLauncher = registerForActivityResult(
+                new ActivityResultContracts.RequestPermission(),
+                isGranted -> {
+                    if (isGranted && currentPermissionRequest != null) {
+                        currentPermissionRequest.grant(currentPermissionRequest.getResources());
+                    } else if (currentPermissionRequest != null) {
+                        currentPermissionRequest.deny();
+                    }
+                    currentPermissionRequest = null;
+                }
+        );
+
         fileChooserLauncher = registerForActivityResult(
                 new ActivityResultContracts.StartActivityForResult(),
                 result -> {
@@ -155,11 +168,6 @@ public class MainActivity extends AppCompatActivity {
         permissionsLauncher = registerForActivityResult(
                 new ActivityResultContracts.RequestMultiplePermissions(),
                 permissions -> {
-                    boolean cameraGranted = permissions.getOrDefault(Manifest.permission.CAMERA, false);
-                    if (cameraGranted && currentPermissionRequest != null) {
-                        currentPermissionRequest.grant(currentPermissionRequest.getResources());
-                        currentPermissionRequest = null;
-                    }
                     launchFileChooserIntent();
                 }
         );
@@ -360,7 +368,7 @@ public class MainActivity extends AppCompatActivity {
                     request.grant(request.getResources());
                     currentPermissionRequest = null;
                 } else {
-                    permissionsLauncher.launch(new String[]{Manifest.permission.CAMERA});
+                    cameraPermissionLauncher.launch(Manifest.permission.CAMERA);
                 }
             }
 
