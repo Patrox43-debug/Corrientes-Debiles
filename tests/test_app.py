@@ -77,7 +77,7 @@ def test_suite():
 
     # 5.5 Test GET /api/setup/status and POST /api/setup
     test_rut = "11.111.111-1"
-    test_pass = "TestMasterKey123"
+    test_pass = "admin123"
 
     with urllib.request.urlopen(f"{base_url}/api/setup/status") as res:
         assert res.status == 200
@@ -87,7 +87,7 @@ def test_suite():
     if not setup_status.get('initialized'):
         setup_payload = json.dumps({
             "rut": test_rut,
-            "nombre": "Admin Pruebas",
+            "nombre": "Administrador",
             "password": test_pass
         }).encode('utf-8')
         setup_req = urllib.request.Request(f"{base_url}/api/setup", data=setup_payload, headers={'Content-Type': 'application/json'})
