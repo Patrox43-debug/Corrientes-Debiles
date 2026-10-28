@@ -1,0 +1,21 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.DS_Store
+
+# Databases
+*.db
+*.db-journal
+*.db-wal
+*.sqlite
+*.sqlite3
+database/inventario.db
+
+# Secrets & Environment
+.env
+.env.*
+*.pem
+*.key
+*.cert
+

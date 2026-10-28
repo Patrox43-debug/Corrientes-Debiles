@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventario y Mantención | Corrientes Débiles</title>
+    <link rel="stylesheet" href="./css/style.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23f97316'><path d='M13 2L3 14h8v8l10-12h-8V2z'/></svg>">
+    <link rel="manifest" href="./manifest.json">
+    <meta name="theme-color" content="#f97316">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+</head>
+<body>
+
+    <!-- NAVBAR -->
+    <header class="navbar">
+        <div class="nav-container">
+            <div class="brand-wrapper" id="brand-link">
+                <div class="brand-icon">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                    </svg>
+                </div>
+                <div>
+                    <div class="brand-title">CORRIENTES <span>DÉBILES</span></div>
+                    <div class="brand-subtitle">Control de Equipamientos & Mantenciones</div>
+                </div>
+            </div>
+
+            <div class="nav-actions" id="nav-actions">
+                <!-- Injected dynamically if logged in -->
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN VIEW CONTAINER -->
+    <main id="app-view">
+        <!-- VISTA DE LOGIN -->
+        <section id="login-section" class="login-container">
+            <div class="login-card">
+                <div class="login-header">
+                    <div class="logo-badge">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                        </svg>
+                    </div>
+                    <h2>Iniciar Sesión</h2>
+                    <p>Acceso al inventario técnico e histórico de mantenciones</p>
+                </div>
+
+                <!-- ALERTA DE PRIMER USO / CONFIGURACIÓN INICIAL -->
+                <div id="first-run-banner" style="display: none; background: rgba(249, 115, 22, 0.1); border: 1px solid var(--accent-orange); border-radius: var(--radius-sm); padding: 0.85rem; margin-bottom: 1rem;">
+                    <div style="display: flex; align-items: flex-start; gap: 0.5rem;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-orange)" stroke-width="2" style="flex-shrink: 0; margin-top: 2px;">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="8" x2="12" y2="12"></line>
+                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                        </svg>
+                        <div style="font-size: 0.85rem; line-height: 1.4;">
+                            <strong style="color: var(--accent-orange); display: block; margin-bottom: 0.2rem;">Bienvenido / Configuración Inicial</strong>
+                            <span style="color: var(--text-secondary);">No hay usuarios registrados. Cree la cuenta del Administrador principal para comenzar.</span>
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-primary" id="btn-open-setup" style="width: 100%; margin-top: 0.75rem; font-size: 0.85rem; padding: 0.5rem;" onclick="app.openSetupModal()">
+                        Crear Primer Administrador
+                    </button>
+                </div>
+
+                <form id="login-form">
+                    <div class="form-group">
+                        <label class="form-label" for="login-rut">RUT</label>
+                        <input type="text" id="login-rut" class="form-control mono" placeholder="12.345.678-9" maxlength="12" autocomplete="username" required>
+                        <div class="form-hint">
+                            <span id="rut-validation-msg" style="color: var(--text-muted);">Sin validar</span>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="login-password">Contraseña</label>
+                        <input type="password" id="login-password" class="form-control" placeholder="••••••••" autocomplete="current-password" required>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 0.5rem;" id="login-submit-btn">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path>
+                            <polyline points="10 17 15 12 10 7"></polyline>
+                            <line x1="15" y1="12" x2="3" y2="12"></line>
+                        </svg>
+                        Ingresar al Sistema
+                    </button>
+                </form>
+
+                <div style="margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--border-subtle); display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                    <button type="button" class="btn-storage-mode" id="login-storage-mode-btn" onclick="app.openCloudModal()" title="Configuración de Almacenamiento Local / Nube">
+                        <span class="mode-dot" id="login-mode-dot"></span>
+                        <span id="login-mode-label">Modo Local</span>
+                    </button>
+                    <a href="/CorrientesDebiles.apk" download="CorrientesDebiles.apk" class="btn btn-outline-orange" style="font-size: 0.75rem; padding: 0.35rem 0.65rem; text-decoration: none;" title="Descargar APK para Android">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+                            <line x1="12" y1="18" x2="12.01" y2="18"></line>
+                        </svg>
+                        Descargar APK
+                    </a>
+                </div>
+            </div>
+        </section>
+
+        <!-- VISTA DE DASHBOARD / LISTADO DE EQUIPOS -->
+        <section id="dashboard-section" class="main-content" style="display: none;">
+            
+            <!-- TARJETAS DE ESTADÍSTICAS (COMPACTAS) -->
+            <div class="stats-grid" id="stats-container">
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
+                            <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
+                            <line x1="6" y1="6" x2="6.01" y2="6"></line>
+                            <line x1="6" y1="18" x2="6.01" y2="18"></line>
+                        </svg>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="stat-total-equipos">0</div>
+                        <div class="stat-label">Total Equipos</div>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon" style="color: var(--status-operativo); border-color: rgba(34, 197, 94, 0.3);">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                            <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                        </svg>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="stat-operativos" style="color: var(--status-operativo);">0</div>
+                        <div class="stat-label">Operativos</div>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon" style="color: var(--orange-primary); border-color: var(--border-accent);">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
+                        </svg>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="stat-en-mantencion" style="color: var(--orange-primary);">0</div>
+                        <div class="stat-label">En Mantención</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- BARRA DE BÚSQUEDA Y ACCIONES -->
+            <div class="toolbar-card">
+                <div class="search-box">
+                    <span class="search-icon">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                        </svg>
+                    </span>
+                    <input type="text" id="search-input" class="search-input" placeholder="Buscar por equipo, marca, modelo, técnico, QR...">
+                    <button type="button" class="search-camera-btn" id="search-qr-cam-btn" title="Escanear código QR con la cámara del dispositivo" onclick="app.openQrScanner()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                            <circle cx="12" cy="13" r="4"></circle>
+                        </svg>
+                        <span>Escanear QR</span>
+                    </button>
+                </div>
+
+                <div class="filters-group">
+                    <div class="view-toggles">
+                        <button type="button" class="view-btn active" id="view-grid-btn" title="Vista en tarjetas">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="3" width="7" height="7"></rect>
+                                <rect x="14" y="3" width="7" height="7"></rect>
+                                <rect x="14" y="14" width="7" height="7"></rect>
+                                <rect x="3" y="14" width="7" height="7"></rect>
+                            </svg>
+                        </button>
+                        <button type="button" class="view-btn" id="view-table-btn" title="Vista en tabla">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="8" y1="6" x2="21" y2="6"></line>
+                                <line x1="8" y1="12" x2="21" y2="12"></line>
+                                <line x1="8" y1="18" x2="21" y2="18"></line>
+                                <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                                <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                                <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                            </svg>
+                        </button>
+                    </div>
+
+                    <button class="btn btn-primary" id="open-new-equipo-btn">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                        Nuevo Equipo
+                    </button>
+                </div>
+            </div>
+                        Nuevo Equipo
+                    </button>
+                </div>
+            </div>
+
+            <!-- CONTENEDOR DE EQUIPOS (GRID O TABLA) -->
+            <div id="equipos-container">
+                <!-- Injected via JavaScript -->
+            </div>
+
+        </section>
+    </main>
+
+    <!-- =======================================================================
+         MODAL 1: ESCANEAR CÓDIGO QR
+         ======================================================================= -->
+    <div class="modal-backdrop" id="qr-scanner-modal">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--orange-primary)" stroke-width="2">
+                        <rect x="3" y="3" width="7" height="7"></rect>
+                        <rect x="14" y="3" width="7" height="7"></rect>
+                        <rect x="14" y="14" width="7" height="7"></rect>
+                        <rect x="3" y="14" width="7" height="7"></rect>
+                    </svg>
+                    Escanear Código QR de Equipo
+                </div>
+                <button type="button" class="modal-close-btn" onclick="app.closeModal('qr-scanner-modal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="scanner-viewport-wrapper">
+                    <video id="scanner-video" class="scanner-video" playsinline></video>
+                    <div class="scanner-overlay">
+                        <div class="scanner-reticle"></div>
+                    </div>
+                </div>
+
+                <div id="camera-status-msg" style="text-align: center; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem;">
+                    Apunte la cámara al código QR ubicado en el chasis del equipo.
+                </div>
+
+                <div style="display: flex; gap: 0.75rem; justify-content: center; margin-bottom: 1.5rem;">
+                    <label class="btn btn-secondary btn-sm" style="cursor: pointer;">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                            <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                            <polyline points="21 15 16 10 5 21"></polyline>
+                        </svg>
+                        Cargar Foto / Imagen
+                        <input type="file" id="scanner-file-input" accept="image/*" style="display: none;">
+                    </label>
+                </div>
+
+                <!-- SELECTOR RÁPIDO Y CÓDIGO MANUAL PARA TESTING / SIN CÁMARA -->
+                <div style="background: var(--bg-surface-2); border: 1px dashed var(--border-subtle); border-radius: var(--radius-sm); padding: 1rem;">
+                    <div style="font-size: 0.76rem; color: var(--orange-primary); font-weight: 700; text-transform: uppercase; margin-bottom: 0.5rem;">
+                        Acceso Rápido por Código (Simulación / Sin Cámara)
+                    </div>
+                    <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem;">
+                        <input type="text" id="manual-qr-input" class="form-control mono" placeholder="Ej: EQ-CCTV-001">
+                        <button type="button" class="btn btn-primary btn-sm" onclick="app.handleManualQrSearch()">
+                            Buscar
+                        </button>
+                    </div>
+                    <div style="font-size: 0.74rem; color: var(--text-muted);">
+                        Seleccione un equipo para probar el escaneo inmediatamente:
+                        <select id="quick-qr-select" class="form-control mono" style="margin-top: 0.35rem;" onchange="if(this.value) app.handleQrDetected(this.value)">
+                            <option value="">-- Seleccionar Equipo de Demostración --</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="app.closeModal('qr-scanner-modal')">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- =======================================================================
+         MODAL 2: VER / IMPRIMIR CÓDIGO QR Y ETIQUETA
+         ======================================================================= -->
+    <div class="modal-backdrop" id="qr-view-modal">
+        <div class="modal-dialog" style="max-width: 480px;">
+            <div class="modal-header">
+                <div class="modal-title">
+                    Código QR de Identificación
+                </div>
+                <button type="button" class="modal-close-btn" onclick="app.closeModal('qr-view-modal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="qr-sticker print-only-sticker" id="printable-qr-card">
+                    <div class="sticker-brand">⚡ SISTEMA CORRIENTES DÉBILES</div>
+                    <div style="font-size: 0.78rem; color: #444; margin-top: 2px;" id="qr-modal-location">-</div>
+                    <div class="qr-canvas-holder" id="qr-code-canvas-container"></div>
+                    <div class="sticker-code" id="qr-modal-code">EQ-000</div>
+                    <div style="margin-top: 0.5rem; font-weight: 700; font-size: 0.95rem;" id="qr-modal-title">Nombre Equipo</div>
+                    <div style="font-size: 0.8rem; color: #333;" id="qr-modal-model">Marca / Modelo</div>
+                    <div style="font-size: 0.72rem; color: #666; margin-top: 0.35rem;" id="qr-modal-install">Instalado: -</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="app.closeModal('qr-view-modal')">Cerrar</button>
+                <button type="button" class="btn btn-primary" onclick="window.print()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                        <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                        <rect x="6" y="14" width="12" height="8"></rect>
+                    </svg>
+                    Imprimir Etiqueta
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- =======================================================================
+         MODAL 3: DETALLE DE EQUIPO E HISTORIAL DE MANTENCIONES
+         ======================================================================= -->
+    <div class="modal-backdrop" id="equipo-detail-modal">
+        <div class="modal-dialog" style="max-width: 780px;">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <span id="detail-nombre">Detalle del Equipo</span>
+                    <span class="tag" id="detail-qr-tag">EQ-000</span>
+                </div>
+                <button type="button" class="modal-close-btn" onclick="app.closeModal('equipo-detail-modal')">&times;</button>
+            </div>
+            <div class="modal-body" id="detail-modal-body">
+                <!-- Dynamically loaded with equipment data & maintenance timeline -->
+            </div>
+            <div class="modal-footer" id="detail-modal-footer">
+                <!-- Actions -->
+            </div>
+        </div>
+    </div>
+
+    <!-- =======================================================================
+         MODAL 4: CREAR O EDITAR EQUIPO
+         ======================================================================= -->
+    <div class="modal-backdrop" id="equipo-form-modal">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <div class="modal-title" id="equipo-form-title">Nuevo Equipo</div>
+                <button type="button" class="modal-close-btn" onclick="app.closeModal('equipo-form-modal')">&times;</button>
+            </div>
+            <form id="equipo-form">
+                <div class="modal-body">
+                    <input type="hidden" id="form-equipo-id">
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                            <label class="form-label" for="form-nombre">Nombre del Equipo *</label>
+                            <input type="text" id="form-nombre" class="form-control" placeholder="Ej: Cámara IP Domo PTZ Perimetral 4K" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="form-marca">Marca *</label>
+                            <input type="text" id="form-marca" class="form-control" placeholder="Ej: Dahua Technology, Cisco, etc." required>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="form-modelo">Modelo *</label>
+                            <input type="text" id="form-modelo" class="form-control" placeholder="Ej: DH-SD49425XB-HNR" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="form-fecha-instalacion">Fecha de Instalación *</label>
+                            <input type="date" id="form-fecha-instalacion" class="form-control mono" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="form-horas-trabajo">Horas de Trabajo (hrs)</label>
+                            <input type="number" step="0.5" min="0" id="form-horas-trabajo" class="form-control" placeholder="0.0">
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="form-estado">Estado Operativo</label>
+                            <select id="form-estado" class="form-control">
+                                <option value="Operativo">Operativo</option>
+                                <option value="En Mantención">En Mantención</option>
+                                <option value="Alerta">Alerta</option>
+                                <option value="Fuera de Servicio">Fuera de Servicio</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                            <label class="form-label" for="form-ubicacion">Ubicación Física / Recinto</label>
+                            <input type="text" id="form-ubicacion" class="form-control" placeholder="Ej: Rack Sala de Servidores Piso 2, Acceso Peatonal Poniente">
+                        </div>
+
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                            <label class="form-label" for="form-caracteristicas">Características del Equipo (Especificaciones Técnicas)</label>
+                            <textarea id="form-caracteristicas" class="form-control" rows="3" placeholder="Potencia, voltajes, consumo eléctrico, resolución, puertos de red, protocolos, capacidades..."></textarea>
+                        </div>
+                    </div>
+
+                    <!-- Campos de primera mantención opcional solo al crear nuevo equipo -->
+                    <div id="first-maintenance-section" style="border-top: 1px solid var(--border-subtle); padding-top: 1rem; margin-top: 0.5rem;">
+                        <div style="font-size: 0.78rem; font-weight: 700; color: var(--orange-primary); text-transform: uppercase; margin-bottom: 0.5rem;">
+                            Registrar Mantención / Puesta en Marcha Inicial (Opcional)
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr; gap: 0.75rem;">
+                            <div>
+                                <label class="form-label" for="form-primera-tecnico">Técnico Responsable</label>
+                                <input type="text" id="form-primera-tecnico" class="form-control" placeholder="Nombre del técnico">
+                            </div>
+                            <div>
+                                <label class="form-label" for="form-primera-obs">Observaciones Técnicas</label>
+                                <input type="text" id="form-primera-obs" class="form-control" placeholder="Instalación inicial, pruebas de conexionado y energización.">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="app.closeModal('equipo-form-modal')">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar Equipo</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- =======================================================================
+         MODAL 5: REGISTRAR NUEVA MANTENCIÓN
+         ======================================================================= -->
+    <div class="modal-backdrop" id="mantencion-modal">
+        <div class="modal-dialog" style="max-width: 560px;">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--orange-primary)" stroke-width="2">
+                        <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
+                    </svg>
+                    Registrar Mantención Técnica
+                </div>
+                <button type="button" class="modal-close-btn" onclick="app.closeModal('mantencion-modal')">&times;</button>
+            </div>
+            <form id="mantencion-form">
+                <div class="modal-body">
+                    <input type="hidden" id="mant-equipo-id">
+
+                    <div style="background: var(--bg-surface-2); padding: 0.75rem 1rem; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle); margin-bottom: 1.25rem;">
+                        <div style="font-size: 0.7rem; text-transform: uppercase; color: var(--text-muted);">Equipo Seleccionado</div>
+                        <div style="font-weight: 700; color: #fff;" id="mant-equipo-nombre">-</div>
+                        <div style="font-size: 0.78rem; font-family: var(--font-mono); color: var(--orange-primary);" id="mant-equipo-code">EQ-000</div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div class="form-group">
+                            <label class="form-label" for="mant-fecha">Fecha de Mantención *</label>
+                            <input type="date" id="mant-fecha" class="form-control mono" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="mant-tipo">Tipo de Mantención</label>
+                            <select id="mant-tipo" class="form-control">
+                                <option value="Preventiva">Preventiva</option>
+                                <option value="Correctiva">Correctiva</option>
+                                <option value="Calibración">Calibración</option>
+                                <option value="Actualización Firmware">Actualización Firmware</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                            <label class="form-label" for="mant-tecnico">Nombre del Técnico *</label>
+                            <input type="text" id="mant-tecnico" class="form-control" placeholder="Ej: Carlos Valenzuela" required>
+                        </div>
+
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                            <label class="form-label" for="mant-estado-update">Actualizar Estado del Equipo</label>
+                            <select id="mant-estado-update" class="form-control">
+                                <option value="Operativo">Operativo (Equipo en óptimas condiciones)</option>
+                                <option value="En Mantención">En Mantención (Trabajos en progreso)</option>
+                                <option value="Alerta">Alerta (Requiere repuesto o seguimiento)</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                            <label class="form-label" for="mant-obs">Observaciones Técnicas Detalladas *</label>
+                            <textarea id="mant-obs" class="form-control" rows="3" placeholder="Detalle exhaustivo de las labores ejecutadas, parámetros medidos, limpieza, repuestos o configuraciones aplicadas..." required></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="app.closeModal('mantencion-modal')">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Registrar en Histórico</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- =======================================================================
+         MODAL 6: PANEL DE ADMINISTRACIÓN DE USUARIOS
+         ======================================================================= -->
+    <div class="modal-backdrop" id="admin-users-modal">
+        <div class="modal-dialog" style="max-width: 820px;">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--orange-primary)" stroke-width="2">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="9" cy="7" r="4"></circle>
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                    </svg>
+                    Gestión de Usuarios y Credenciales
+                </div>
+                <button type="button" class="modal-close-btn" onclick="app.closeModal('admin-users-modal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 0.75rem;">
+                    <div>
+                        <div style="color: #fff; font-weight: 600; font-size: 0.95rem;">Cuentas de Acceso al Sistema</div>
+                        <div style="font-size: 0.75rem; color: var(--text-muted);">Administre credenciales, roles y permisos de los operadores técnicos.</div>
+                    </div>
+                    <button type="button" class="btn btn-primary btn-sm" onclick="app.openNewUserModal()">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                        + Nuevo Usuario
+                    </button>
+                </div>
+
+                <div class="equipos-table-wrapper">
+                    <table class="equipos-table" id="admin-users-table">
+                        <thead>
+                            <tr>
+                                <th>RUT</th>
+                                <th>Nombre Completo</th>
+                                <th>Rol</th>
+                                <th>Fecha Alta</th>
+                                <th style="text-align: right;">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-users-tbody">
+                            <!-- Injected by JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="app.closeModal('admin-users-modal')">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- =======================================================================
+         MODAL 7: CREAR / EDITAR USUARIO
+         ======================================================================= -->
+    <div class="modal-backdrop" id="user-form-modal">
+        <div class="modal-dialog" style="max-width: 480px;">
+            <div class="modal-header">
+                <div class="modal-title" id="user-form-title">Nuevo Usuario</div>
+                <button type="button" class="modal-close-btn" onclick="app.closeModal('user-form-modal')">&times;</button>
+            </div>
+            <form id="user-form">
+                <div class="modal-body">
+                    <input type="hidden" id="user-form-id">
+
+                    <div class="form-group">
+                        <label class="form-label" for="user-form-rut">RUT *</label>
+                        <input type="text" id="user-form-rut" class="form-control mono" placeholder="12.345.678-9" maxlength="12" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="user-form-nombre">Nombre y Apellidos *</label>
+                        <input type="text" id="user-form-nombre" class="form-control" placeholder="Ej: Marcela Contreras" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="user-form-rol">Rol de Acceso</label>
+                        <select id="user-form-rol" class="form-control">
+                            <option value="tecnico">Técnico de Terreno (Acceso a inventario y mantenciones)</option>
+                            <option value="admin">Administrador (Control total y gestión de usuarios)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="user-form-password">
+                            <span id="user-form-pass-label">Contraseña *</span>
+                        </label>
+                        <input type="password" id="user-form-password" class="form-control" placeholder="••••••••" autocomplete="new-password">
+                        <div class="form-hint" id="user-form-pass-hint">
+                            <span>Mínimo 6 caracteres</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="app.closeModal('user-form-modal')">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" id="user-form-submit-btn">Guardar Usuario</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- =======================================================================
+         MODAL 8: ALMACENAMIENTO Y CONFIGURACIÓN NUBE / APK
+         ======================================================================= -->
+    <div class="modal-backdrop" id="cloud-modal">
+        <div class="modal-dialog" style="max-width: 540px;">
+            <div class="modal-header">
+                <div class="modal-title" style="display: flex; align-items: center; gap: 0.5rem;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"></path>
+                    </svg>
+                    Almacenamiento y Conexión Nube
+                </div>
+                <button type="button" class="modal-close-btn" onclick="app.closeModal('cloud-modal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="font-size: 0.84rem; color: var(--text-secondary); margin-bottom: 1rem;">
+                    Configura si deseas operar de forma <strong>100% Local</strong> en este dispositivo o conectarte a una <strong>Base de Datos en la Nube</strong>.
+                </p>
+
+                <!-- SELECTOR DE MODO -->
+                <div class="storage-mode-cards">
+                    <div class="storage-mode-card selected" id="mode-card-local" onclick="app.selectStorageMode('local')">
+                        <div class="storage-mode-header">
+                            <span>Modo Local (Offline)</span>
+                            <span class="mode-dot"></span>
+                        </div>
+                        <div class="storage-mode-desc">
+                            <strong>Activo por defecto.</strong> Todo se almacena en el teléfono o equipo. Cero dependencia de internet o servidores externos.
+                        </div>
+                    </div>
+
+                    <div class="storage-mode-card" id="mode-card-cloud" onclick="app.selectStorageMode('cloud')">
+                        <div class="storage-mode-header">
+                            <span>Modo Nube (Remoto)</span>
+                            <span class="mode-dot cloud"></span>
+                        </div>
+                        <div class="storage-mode-desc">
+                            <strong>Habilitado para el futuro.</strong> Sincroniza con un servidor central y base de datos compartida entre técnicos.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PANEL DE CONFIGURACIÓN DE NUBE -->
+                <div id="cloud-settings-panel" style="background: var(--bg-surface-2); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 0.9rem; margin-bottom: 1rem;">
+                    <div style="font-weight: 600; font-size: 0.88rem; margin-bottom: 0.5rem; color: #fff;">
+                        Conexión con la Nube / API
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0.65rem;">
+                        <label class="form-label" for="cloud-url-input">URL del Servidor o API</label>
+                        <input type="url" id="cloud-url-input" class="form-control mono" placeholder="https://api.tuempresa.cl o http://localhost:8080">
+                        <div class="form-hint">
+                            <span>Dirección del backend o base de datos en internet/red</span>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; gap: 0.45rem; flex-wrap: wrap;">
+                        <button type="button" class="btn btn-secondary" style="font-size: 0.76rem; padding: 0.4rem 0.65rem;" onclick="app.testCloudConnection()">
+                            🔌 Probar Conexión
+                        </button>
+                        <button type="button" class="btn btn-outline-orange" style="font-size: 0.76rem; padding: 0.4rem 0.65rem;" onclick="app.syncPushLocalToCloud()">
+                            ⬆️ Subir a la Nube (Sincronizar)
+                        </button>
+                        <button type="button" class="btn btn-secondary" style="font-size: 0.76rem; padding: 0.4rem 0.65rem;" onclick="app.syncPullCloudToLocal()">
+                            ⬇️ Descargar de Nube
+                        </button>
+                    </div>
+                    <div id="cloud-test-status" style="margin-top: 0.65rem; font-size: 0.78rem; padding: 0.4rem 0.6rem; border-radius: 4px; display: none;"></div>
+                </div>
+
+                <!-- DESCARGA DEL APK -->
+                <div class="apk-download-box">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.4rem;">
+                        <div style="font-weight: 700; font-size: 0.92rem; color: var(--orange-primary); display: flex; align-items: center; gap: 0.4rem;">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+                                <line x1="12" y1="18" x2="12.01" y2="18"></line>
+                            </svg>
+                            Descarga de APK para Teléfonos Android
+                        </div>
+                        <span class="badge badge-operativo" style="font-size: 0.68rem;">Empaquetado Listo</span>
+                    </div>
+                    <p style="font-size: 0.76rem; color: var(--text-secondary); margin-bottom: 0.75rem; line-height: 1.35;">
+                        Descarga el archivo APK para instalar directamente en tu teléfono Android. Funciona 100% local e incluye escáner con cámara.
+                    </p>
+                    <a href="/CorrientesDebiles.apk" download="CorrientesDebiles.apk" class="btn btn-primary" style="width: 100%; justify-content: center; text-decoration: none; padding: 0.6rem;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        Descargar Archivo APK (CorrientesDebiles.apk)
+                    </a>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="app.closeModal('cloud-modal')">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="app.saveCloudSettings()">Guardar Configuración</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- =======================================================================
+         MODAL 9: CONFIGURACIÓN INICIAL DEL PRIMER ADMINISTRADOR
+         ======================================================================= -->
+    <div class="modal-backdrop" id="setup-admin-modal">
+        <div class="modal-dialog" style="max-width: 480px;">
+            <div class="modal-header">
+                <div class="modal-title" style="display: flex; align-items: center; gap: 0.5rem;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2a5 5 0 0 0-5 5v3H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2h-1V7a5 5 0 0 0-5-5z"></path>
+                    </svg>
+                    Configuración Inicial: Crear Administrador
+                </div>
+                <button type="button" class="modal-close-btn" onclick="app.closeModal('setup-admin-modal')">&times;</button>
+            </div>
+            <form id="setup-admin-form" onsubmit="app.handleSetupAdmin(event)">
+                <div class="modal-body">
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.25rem;">
+                        Por seguridad, no existen contraseñas por defecto. Configura la cuenta del Administrador principal con tus propios datos:
+                    </p>
+
+                    <div class="form-group">
+                        <label class="form-label" for="setup-admin-rut">RUT Chileno *</label>
+                        <input type="text" id="setup-admin-rut" class="form-control mono" placeholder="12.345.678-9" maxlength="12" required>
+                        <div class="form-hint">
+                            <span id="setup-rut-validation-msg" style="color: var(--text-muted);">Sin validar</span>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="setup-admin-nombre">Nombre y Apellidos *</label>
+                        <input type="text" id="setup-admin-nombre" class="form-control" placeholder="Ej: Administrador General" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="setup-admin-password">Contraseña *</label>
+                        <input type="password" id="setup-admin-password" class="form-control" placeholder="••••••••" autocomplete="new-password" required>
+                        <div class="form-hint"><span>Mínimo 4 caracteres</span></div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="setup-admin-password-confirm">Confirmar Contraseña *</label>
+                        <input type="password" id="setup-admin-password-confirm" class="form-control" placeholder="••••••••" autocomplete="new-password" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="app.closeModal('setup-admin-modal')">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" id="setup-admin-submit-btn">Crear Administrador e Ingresar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- TOAST CONTAINER -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <!-- JAVASCRIPT ASSETS -->
+    <script src="./js/qrcode.min.js"></script>
+    <script src="./js/qrscanner.js"></script>
+    <script src="./js/rut.js"></script>
+    <script src="./js/storage.js"></script>
+    <script src="./js/app.js"></script>
+</body>
+</html>
