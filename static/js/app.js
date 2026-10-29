@@ -317,7 +317,7 @@ class AppController {
         const firstName = (this.currentUser?.nombre || 'Usuario').split(' ')[0];
         const roleName = isAdmin ? 'Administrador' : 'Técnico';
         const isLocal = !window.appStorage || window.appStorage.getMode() === 'local';
-        const currentVer = (window.APP_VERSION || '1.0.16').replace(/^[vV]/, '');
+        const currentVer = (window.APP_VERSION || '1.0.17').replace(/^[vV]/, '');
         const apkFilename = `CDmantencion_v${currentVer}.apk`;
 
         navActions.innerHTML = `
@@ -756,6 +756,14 @@ class AppController {
                                 </svg>
                                 QR
                             </button>
+                            <button class="btn btn-secondary btn-sm" title="Descargar Código QR a Galería" onclick="app.downloadEquipoQr(${eq.id})">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                    <polyline points="7 10 12 15 17 10"></polyline>
+                                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                                </svg>
+                                Descargar
+                            </button>
                             <button class="btn btn-primary btn-sm" onclick="app.openDetailModal(${eq.id})">
                                 Detalle & Mantenciones
                             </button>
@@ -841,6 +849,13 @@ class AppController {
                             <button class="btn btn-secondary btn-sm" title="Ver QR" onclick="app.showQrModal(${eq.id})">
                                 QR
                             </button>
+                            <button class="btn btn-secondary btn-sm" title="Descargar QR a Galería" onclick="app.downloadEquipoQr(${eq.id})">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                    <polyline points="7 10 12 15 17 10"></polyline>
+                                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                                </svg>
+                            </button>
                             <button class="btn btn-outline-orange btn-sm" onclick="app.openDetailModal(${eq.id})">
                                 Ver
                             </button>
@@ -904,13 +919,33 @@ class AppController {
         this.openModal('qr-view-modal');
     }
 
+    getQrDataUrlWithQuietZone(sourceCanvasOrImg, padding = 24) {
+        if (!sourceCanvasOrImg) return '';
+        try {
+            const width = sourceCanvasOrImg.width || sourceCanvasOrImg.naturalWidth || 256;
+            const height = sourceCanvasOrImg.height || sourceCanvasOrImg.naturalHeight || 256;
+            const outCanvas = document.createElement('canvas');
+            outCanvas.width = width + (padding * 2);
+            outCanvas.height = height + (padding * 2);
+            const ctx = outCanvas.getContext('2d');
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, outCanvas.width, outCanvas.height);
+            ctx.drawImage(sourceCanvasOrImg, padding, padding, width, height);
+            return outCanvas.toDataURL('image/png');
+        } catch (e) {
+            console.warn('Error agregando quiet zone a QR:', e);
+            return '';
+        }
+    }
+
     downloadQrImage() {
         const code = document.getElementById('qr-modal-code')?.textContent || 'QR-Code';
         const canvas = document.querySelector('#qr-code-canvas-container canvas');
         const img = document.querySelector('#qr-code-canvas-container img');
+        const targetElement = canvas || img;
 
-        let dataUrl = '';
-        if (canvas) {
+        let dataUrl = this.getQrDataUrlWithQuietZone(targetElement, 24);
+        if (!dataUrl && canvas) {
             try { dataUrl = canvas.toDataURL('image/png'); } catch (e) {}
         }
         if (!dataUrl && img && img.src) {
@@ -922,13 +957,90 @@ class AppController {
             return;
         }
 
+        const fileName = `${code}.png`;
+
+        // 1. Si estamos en el APK nativo de Android
+        if (window.AndroidBridge && typeof window.AndroidBridge.saveBase64Image === 'function') {
+            window.AndroidBridge.saveBase64Image(dataUrl, fileName);
+            this.showToast(`✓ Guardando en Galería / Fotos: ${fileName}`, 'success');
+            return;
+        }
+
+        // 2. Navegador web estándar
         const a = document.createElement('a');
         a.href = dataUrl;
-        a.download = `${code}.png`;
+        a.download = fileName;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
-        this.showToast(`✓ Imagen descargada: ${code}.png`, 'success');
+        this.showToast(`✓ Imagen descargada: ${fileName}`, 'success');
+    }
+
+    downloadEquipoQr(equipoId) {
+        let localEq = (window.appStorage && window.appStorage.localDb) ? window.appStorage.localDb.getEquipoById(equipoId) : null;
+        let listEq = this.equipos ? this.equipos.find(e => e.id === equipoId) : null;
+        const equipo = { ...(listEq || {}), ...(localEq || {}) };
+        if (!equipo || !equipo.id) return;
+
+        const code = equipo.codigo_qr || `EQ-ID-${equipo.id}`;
+        const fileName = `${code}.png`;
+
+        const tempDiv = document.createElement('div');
+        tempDiv.style.position = 'fixed';
+        tempDiv.style.left = '-9999px';
+        tempDiv.style.top = '-9999px';
+        document.body.appendChild(tempDiv);
+
+        try {
+            new QRCode(tempDiv, {
+                text: code,
+                width: 280,
+                height: 280,
+                colorDark: "#000000",
+                colorLight: "#ffffff",
+                correctLevel: QRCode.CorrectLevel.M
+            });
+
+            const canvas = tempDiv.querySelector('canvas');
+            const img = tempDiv.querySelector('img');
+            const targetElement = canvas || img;
+
+            let dataUrl = this.getQrDataUrlWithQuietZone(targetElement, 28);
+            if (!dataUrl && canvas) {
+                try { dataUrl = canvas.toDataURL('image/png'); } catch (e) {}
+            }
+            if (!dataUrl && img && img.src) {
+                dataUrl = img.src;
+            }
+
+            if (!dataUrl) {
+                this.showToast('No se pudo generar la imagen del código QR', 'error');
+                return;
+            }
+
+            // Si corre en APK nativo de Android
+            if (window.AndroidBridge && typeof window.AndroidBridge.saveBase64Image === 'function') {
+                window.AndroidBridge.saveBase64Image(dataUrl, fileName);
+                this.showToast(`✓ Guardando en Galería / Fotos: ${fileName}`, 'success');
+                return;
+            }
+
+            // Navegador web estándar
+            const a = document.createElement('a');
+            a.href = dataUrl;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            this.showToast(`✓ Imagen descargada: ${fileName}`, 'success');
+        } catch (e) {
+            console.error('Error generando QR para descargar:', e);
+            this.showToast('Error al descargar código QR', 'error');
+        } finally {
+            if (tempDiv.parentNode) {
+                tempDiv.parentNode.removeChild(tempDiv);
+            }
+        }
     }
 
     printQrCard() {
@@ -1488,6 +1600,14 @@ class AppController {
             </button>
             <button type="button" class="btn btn-secondary btn-sm" onclick="app.showQrModal(${eq.id})">
                 Ver QR
+            </button>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="app.downloadEquipoQr(${eq.id})" title="Descargar código QR a Galería">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: text-bottom;">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                Descargar QR
             </button>
             <button type="button" class="btn btn-primary btn-sm" onclick="app.closeModal('equipo-detail-modal')">
                 Listo
@@ -2298,7 +2418,7 @@ class AppController {
             if (!res.ok) throw new Error('HTTP ' + res.status);
             const data = await res.json();
             const remoteTag = (data.tag_name || '').trim().replace(/^[vV]/, '');
-            const currentVer = (window.APP_VERSION || '1.0.16').replace(/^[vV]/, '');
+            const currentVer = (window.APP_VERSION || '1.0.17').replace(/^[vV]/, '');
 
             if (this.isNewerVersion(remoteTag, currentVer)) {
                 let apkUrl = 'https://github.com/Patrox43-debug/Corrientes-Debiles/releases/latest/download/CDmantencion.apk';

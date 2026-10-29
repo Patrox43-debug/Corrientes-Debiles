@@ -62,7 +62,9 @@ import com.google.android.material.button.MaterialButton;
 
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.OutputStream;
 import java.io.IOException;
+import android.content.ContentValues;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
@@ -434,6 +436,17 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onDownloadStart(String url, String userAgent, String contentDisposition, String mimeType, long contentLength) {
                 try {
+                    if (url != null && url.startsWith("data:image/")) {
+                        String guessedName = "QR_" + System.currentTimeMillis() + ".png";
+                        if (contentDisposition != null && contentDisposition.contains("filename=")) {
+                            try {
+                                guessedName = contentDisposition.split("filename=")[1].split(";")[0].replace("\"", "").replace("'", "").trim();
+                            } catch (Exception ignored) {}
+                        }
+                        new AndroidBridge().saveBase64Image(url, guessedName);
+                        return;
+                    }
+
                     if (url.endsWith(".apk") || (mimeType != null && mimeType.contains("vnd.android.package-archive"))) {
                         downloadAndInstallApk(url);
                         return;
@@ -662,6 +675,75 @@ public class MainActivity extends AppCompatActivity {
             runOnUiThread(() -> {
                 if (ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
                     cameraPermissionLauncher.launch(Manifest.permission.CAMERA);
+                }
+            });
+        }
+
+        @JavascriptInterface
+        public void saveBase64Image(String base64Data, String fileName) {
+            if (base64Data == null || base64Data.isEmpty()) return;
+
+            runOnUiThread(() -> {
+                try {
+                    String cleanBase64 = base64Data;
+                    if (cleanBase64.contains(",")) {
+                        cleanBase64 = cleanBase64.substring(cleanBase64.indexOf(",") + 1);
+                    }
+                    byte[] imageBytes = Base64.decode(cleanBase64, Base64.DEFAULT);
+
+                    String name = (fileName != null && !fileName.trim().isEmpty()) ? fileName.trim() : ("QR_" + System.currentTimeMillis() + ".png");
+                    if (!name.toLowerCase().endsWith(".png") && !name.toLowerCase().endsWith(".jpg") && !name.toLowerCase().endsWith(".jpeg")) {
+                        name += ".png";
+                    }
+
+                    boolean saved = false;
+
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        try {
+                            ContentValues values = new ContentValues();
+                            values.put(MediaStore.Images.Media.DISPLAY_NAME, name);
+                            values.put(MediaStore.Images.Media.MIME_TYPE, "image/png");
+                            values.put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/CDmantencion");
+                            values.put(MediaStore.Images.Media.IS_PENDING, 1);
+
+                            Uri uri = getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
+                            if (uri != null) {
+                                try (OutputStream out = getContentResolver().openOutputStream(uri)) {
+                                    if (out != null) {
+                                        out.write(imageBytes);
+                                        out.flush();
+                                    }
+                                }
+                                values.clear();
+                                values.put(MediaStore.Images.Media.IS_PENDING, 0);
+                                getContentResolver().update(uri, values, null, null);
+                                saved = true;
+                            }
+                        } catch (Exception qEx) {
+                            android.util.Log.w("MainActivity", "Fallo inserción MediaStore Scoped, intentando fallback legacy", qEx);
+                        }
+                    }
+
+                    if (!saved) {
+                        File dir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "CDmantencion");
+                        if (!dir.exists()) dir.mkdirs();
+                        File file = new File(dir, name);
+                        try (FileOutputStream fos = new FileOutputStream(file)) {
+                            fos.write(imageBytes);
+                            fos.flush();
+                        }
+                        MediaScannerConnection.scanFile(MainActivity.this, new String[]{file.getAbsolutePath()}, new String[]{"image/png"}, null);
+                        saved = true;
+                    }
+
+                    if (saved) {
+                        Toast.makeText(MainActivity.this, "✓ Código QR guardado en Galería (Fotos/CDmantencion): " + name, Toast.LENGTH_LONG).show();
+                    } else {
+                        Toast.makeText(MainActivity.this, "No se pudo guardar la imagen", Toast.LENGTH_SHORT).show();
+                    }
+                } catch (Exception e) {
+                    android.util.Log.e("MainActivity", "Error guardando imagen QR", e);
+                    Toast.makeText(MainActivity.this, "Error al guardar código QR: " + e.getMessage(), Toast.LENGTH_SHORT).show();
                 }
             });
         }
