@@ -1374,11 +1374,27 @@ body {
 @media print {
     @page {
         size: auto;
-        margin: 10mm;
+        margin: 8mm;
     }
 
     *, *::before, *::after {
         box-sizing: border-box;
+    }
+
+    /* Ocultar ABSOLUTAMENTE TODOS los elementos del sitio con display:none para eliminar su espacio */
+    body > *:not(#qr-view-modal) {
+        display: none !important;
+    }
+
+    header,
+    nav,
+    main,
+    footer,
+    #app-view,
+    .navbar,
+    .toast-container,
+    .modal-backdrop:not(#qr-view-modal) {
+        display: none !important;
     }
 
     html, body {
@@ -1388,25 +1404,28 @@ body {
         padding: 0 !important;
         width: 100% !important;
         height: auto !important;
-    }
-
-    /* Ocultar toda la interfaz externa */
-    body * {
-        visibility: hidden !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        overflow: visible !important;
     }
 
     /* Mostrar únicamente el contenedor del modal de etiqueta */
     .modal-backdrop#qr-view-modal {
         position: static !important;
-        background: transparent !important;
         display: block !important;
+        background: transparent !important;
         padding: 0 !important;
         margin: 0 !important;
         opacity: 1 !important;
         visibility: visible !important;
+        width: 100% !important;
+        height: auto !important;
+        backdrop-filter: none !important;
     }
 
     .modal-dialog {
+        position: static !important;
+        display: block !important;
         box-shadow: none !important;
         border: none !important;
         background: transparent !important;
@@ -1414,19 +1433,23 @@ body {
         max-width: 100% !important;
         padding: 0 !important;
         visibility: visible !important;
+        transform: none !important;
     }
 
-    .modal-header, .modal-footer, .modal-close-btn {
+    .modal-header,
+    .modal-footer,
+    .modal-close-btn {
         display: none !important;
-        visibility: hidden !important;
     }
 
     .modal-body {
-        padding: 0 !important;
+        padding: 20mm 0 0 0 !important;
         margin: 0 !important;
         visibility: visible !important;
         display: flex !important;
         justify-content: center !important;
+        background: transparent !important;
+        border: none !important;
     }
 
     /* Visibilidad y formateo de la etiqueta de impresión (1 sola página) */
@@ -1438,13 +1461,14 @@ body {
         position: relative !important;
         left: auto !important;
         top: auto !important;
-        margin: 2rem auto !important;
+        margin: 0 auto !important;
         width: 260px !important;
         max-width: 260px !important;
         box-shadow: none !important;
         border: 1px solid #cbd5e1 !important;
         border-radius: 8px !important;
         padding: 1.15rem 1.15rem 1rem !important;
+        background: #ffffff !important;
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
         page-break-inside: avoid !important;

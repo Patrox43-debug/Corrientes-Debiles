@@ -791,6 +791,158 @@ class AppController {
         this.openModal('qr-view-modal');
     }
 
+    printQrCard() {
+        const code = document.getElementById('qr-modal-code')?.textContent || '';
+        const title = document.getElementById('qr-modal-title')?.textContent || '';
+        const canvas = document.querySelector('#qr-code-canvas-container canvas');
+        const img = document.querySelector('#qr-code-canvas-container img');
+
+        let qrSrc = '';
+        if (canvas) {
+            try { qrSrc = canvas.toDataURL('image/png'); } catch (e) {}
+        }
+        if (!qrSrc && img && img.src) {
+            qrSrc = img.src;
+        }
+
+        // Crear iframe aislado para imprimir única y exclusivamente la etiqueta
+        // garantizando 1 sola página en cualquier navegador, impresora o dispositivo
+        const iframe = document.createElement('iframe');
+        iframe.id = 'print-qr-frame';
+        iframe.style.position = 'fixed';
+        iframe.style.right = '0';
+        iframe.style.bottom = '0';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = '0';
+        iframe.style.visibility = 'hidden';
+        document.body.appendChild(iframe);
+
+        const doc = iframe.contentWindow.document;
+        doc.open();
+        doc.write(`
+            <!DOCTYPE html>
+            <html lang="es">
+            <head>
+                <meta charset="utf-8">
+                <title>Etiqueta ${code}</title>
+                <style>
+                    @page {
+                        size: auto;
+                        margin: 10mm;
+                    }
+                    *, *::before, *::after {
+                        box-sizing: border-box;
+                        margin: 0;
+                        padding: 0;
+                    }
+                    html, body {
+                        width: 100%;
+                        height: 100%;
+                        background: #ffffff !important;
+                        color: #0f172a !important;
+                        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+                        display: flex;
+                        justify-content: center;
+                        align-items: flex-start;
+                        padding-top: 20mm;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
+                    .qr-sticker {
+                        background: #ffffff;
+                        color: #0f172a;
+                        padding: 1.15rem 1.15rem 1rem;
+                        border-radius: 8px;
+                        width: 260px;
+                        max-width: 260px;
+                        border: 1px solid #cbd5e1;
+                        text-align: center;
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                        box-sizing: border-box;
+                        page-break-inside: avoid !important;
+                        break-inside: avoid !important;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
+                    .qr-canvas-holder {
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                        background: #ffffff;
+                        padding: 0.35rem;
+                        border: 1px solid #cbd5e1;
+                        border-radius: 6px;
+                        margin-bottom: 0.55rem;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
+                    .qr-canvas-holder img {
+                        display: block;
+                        width: 175px !important;
+                        height: 175px !important;
+                    }
+                    .sticker-code {
+                        font-family: monospace, Courier, monospace;
+                        font-weight: 800;
+                        font-size: 0.98rem;
+                        background: #000000 !important;
+                        color: #ffffff !important;
+                        padding: 0.25rem 0.9rem;
+                        border-radius: 4px;
+                        letter-spacing: 0.06em;
+                        display: inline-block;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
+                    .sticker-divider {
+                        width: 100%;
+                        border-top: 1.5px dashed #cbd5e1 !important;
+                        margin: 0.7rem 0 0.55rem;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
+                    .sticker-title {
+                        font-weight: 700;
+                        font-size: 0.88rem;
+                        color: #0f172a !important;
+                        line-height: 1.35;
+                        text-align: center;
+                        word-break: break-word;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="qr-sticker">
+                    <div class="qr-canvas-holder">
+                        <img src="${qrSrc}" alt="${code}">
+                    </div>
+                    <div class="sticker-code">${code}</div>
+                    <div class="sticker-divider"></div>
+                    <div class="sticker-title">${title}</div>
+                </div>
+            </body>
+            </html>
+        `);
+        doc.close();
+
+        setTimeout(() => {
+            try {
+                iframe.contentWindow.focus();
+                iframe.contentWindow.print();
+            } catch (err) {
+                console.warn('Fallback a window.print():', err);
+                window.print();
+            } finally {
+                setTimeout(() => {
+                    try { document.body.removeChild(iframe); } catch (e) {}
+                }, 2000);
+            }
+        }, 200);
+    }
+
     openQrScanner() {
         this.openModal('qr-scanner-modal');
         const video = document.getElementById('scanner-video');
