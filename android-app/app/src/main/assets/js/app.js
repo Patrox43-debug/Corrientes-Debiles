@@ -1964,7 +1964,7 @@ class AppController {
             if (!res.ok) throw new Error('HTTP ' + res.status);
             const data = await res.json();
             const remoteTag = (data.tag_name || '').trim().replace(/^[vV]/, '');
-            const currentVer = (window.APP_VERSION || '1.0.8').replace(/^[vV]/, '');
+            const currentVer = (window.APP_VERSION || '1.0.10').replace(/^[vV]/, '');
 
             if (this.isNewerVersion(remoteTag, currentVer)) {
                 let apkUrl = 'https://github.com/Patrox43-debug/Corrientes-Debiles/releases/latest/download/CDmantencion.apk';

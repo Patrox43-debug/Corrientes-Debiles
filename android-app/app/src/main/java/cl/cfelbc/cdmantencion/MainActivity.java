@@ -671,13 +671,16 @@ public class MainActivity extends AppCompatActivity {
 
                     org.json.JSONArray assets = json.optJSONArray("assets");
                     if (assets != null) {
+                        String preferredName = "CDmantencion_" + tagName + ".apk";
                         for (int i = 0; i < assets.length(); i++) {
                             JSONObject asset = assets.getJSONObject(i);
                             String assetName = asset.optString("name", "");
                             if (assetName.endsWith(".apk")) {
-                                downloadUrl = asset.optString("browser_download_url", null);
-                                if (assetName.equals("CDmantencion.apk")) {
-                                    break;
+                                if (downloadUrl == null || assetName.equals(preferredName) || assetName.equals("CDmantencion.apk")) {
+                                    downloadUrl = asset.optString("browser_download_url", null);
+                                    if (assetName.equals(preferredName)) {
+                                        break;
+                                    }
                                 }
                             }
                         }
@@ -686,7 +689,7 @@ public class MainActivity extends AppCompatActivity {
 
                 // Si no se obtuvo URL por los assets, usar la ruta directa de release
                 if (downloadUrl == null && tagName != null && !tagName.isEmpty()) {
-                    downloadUrl = "https://github.com/Patrox43-debug/Corrientes-Debiles/releases/download/" + tagName + "/CDmantencion.apk";
+                    downloadUrl = "https://github.com/Patrox43-debug/Corrientes-Debiles/releases/download/" + tagName + "/CDmantencion_" + tagName + ".apk";
                 }
                 if (downloadUrl == null) {
                     downloadUrl = "https://github.com/Patrox43-debug/Corrientes-Debiles/releases/latest/download/CDmantencion.apk";
@@ -779,7 +782,7 @@ public class MainActivity extends AppCompatActivity {
                 .setTitle("⚡ Actualización de CDmantencion")
                 .setMessage(msg)
                 .setPositiveButton("Actualizar Ahora", (dialog, which) -> {
-                    downloadAndInstallApk(downloadUrl);
+                    downloadAndInstallApk(downloadUrl, newVersion);
                 })
                 .setNegativeButton("Más tarde", null)
                 .setCancelable(true)
@@ -849,6 +852,10 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void downloadAndInstallApk(String apkUrl) {
+        downloadAndInstallApk(apkUrl, null);
+    }
+
+    private void downloadAndInstallApk(String apkUrl, String targetVersion) {
         if (apkUrl == null || apkUrl.trim().isEmpty()) {
             Toast.makeText(this, "URL de actualización no válida.", Toast.LENGTH_SHORT).show();
             return;
@@ -912,7 +919,12 @@ public class MainActivity extends AppCompatActivity {
                     downloadDir.mkdirs();
                 }
 
-                File apkFile = new File(downloadDir, "CDmantencion_update.apk");
+                // Nombrar el archivo con el tag de la versión (ej. CDmantencion_v1.0.10.apk)
+                String vClean = (targetVersion != null && !targetVersion.trim().isEmpty())
+                        ? (targetVersion.startsWith("v") ? targetVersion : "v" + targetVersion)
+                        : ("v" + BuildConfig.VERSION_NAME);
+                String apkFileName = "CDmantencion_" + vClean + ".apk";
+                File apkFile = new File(downloadDir, apkFileName);
                 if (apkFile.exists()) {
                     apkFile.delete();
                 }

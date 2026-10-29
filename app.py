@@ -195,13 +195,15 @@ class CustomRequestHandler(http.server.SimpleHTTPRequestHandler):
                                     break
                     except Exception:
                         pass
+                apk_name = f"CDmantencion_v{version_name}.apk"
                 return self.send_json({
                     "version_name": version_name,
                     "version_code": 1,
                     "release_tag": f"v{version_name}",
-                    "download_url": f"https://github.com/Patrox43-debug/Corrientes-Debiles/releases/download/v{version_name}/CDmantencion.apk",
-                    "latest_url": "https://github.com/Patrox43-debug/Corrientes-Debiles/releases/latest/download/CDmantencion.apk",
-                    "notes": "Compilación oficial CDmantencion para Android con firma criptográfica persistente y sincronización en la nube.",
+                    "apk_filename": apk_name,
+                    "download_url": f"https://github.com/Patrox43-debug/Corrientes-Debiles/releases/download/v{version_name}/{apk_name}",
+                    "latest_url": f"https://github.com/Patrox43-debug/Corrientes-Debiles/releases/latest/download/{apk_name}",
+                    "notes": f"Compilación oficial CDmantencion v{version_name} para Android con firma criptográfica persistente y sincronización en la nube.",
                     "app_name": "CDmantencion"
                 })
 
@@ -212,25 +214,43 @@ class CustomRequestHandler(http.server.SimpleHTTPRequestHandler):
 
             return self.send_json({"error": "Endpoint not found"}, status=404)
 
-        # Direct APK Download (CDmantencion.apk and alias CorrientesDebiles.apk)
-        if path in ('/CDmantencion.apk', '/CorrientesDebiles.apk'):
-            apk_path = os.path.join(STATIC_DIR, 'CDmantencion.apk')
-            if not os.path.exists(apk_path):
-                apk_path = os.path.join(BASE_DIR, 'CDmantencion.apk')
-            if os.path.exists(apk_path):
+        # Direct APK Download (versioned and standard aliases)
+        if path.endswith('.apk') and ('CDmantencion' in path or 'CorrientesDebiles' in path):
+            version_name = "1.0.0"
+            gradle_file = os.path.join(BASE_DIR, 'android-app', 'app', 'build.gradle')
+            if os.path.exists(gradle_file):
+                try:
+                    with open(gradle_file, 'r', encoding='utf-8') as gf:
+                        for gline in gf:
+                            if 'versionName' in gline and '"' in gline:
+                                version_name = gline.split('"')[1]
+                                break
+                except Exception:
+                    pass
+
+            target_filename = f"CDmantencion_v{version_name}.apk"
+            possible_paths = [
+                os.path.join(BASE_DIR, target_filename),
+                os.path.join(STATIC_DIR, target_filename),
+                os.path.join(BASE_DIR, 'CDmantencion.apk'),
+                os.path.join(STATIC_DIR, 'CDmantencion.apk')
+            ]
+            apk_path = next((p for p in possible_paths if os.path.exists(p)), None)
+
+            if apk_path:
                 with open(apk_path, 'rb') as f:
                     apk_content = f.read()
                 self.send_response(200)
                 self.send_header('Content-Type', 'application/vnd.android.package-archive')
-                self.send_header('Content-Disposition', 'attachment; filename="CDmantencion.apk"')
+                self.send_header('Content-Disposition', f'attachment; filename="{target_filename}"')
                 self.send_header('Content-Length', str(len(apk_content)))
                 self.end_headers()
                 self.wfile.write(apk_content)
                 return
             else:
-                # Redirect to GitHub Releases latest download
+                # Redirect to GitHub Releases download
                 self.send_response(302)
-                self.send_header('Location', 'https://github.com/Patrox43-debug/Corrientes-Debiles/releases/latest/download/CDmantencion.apk')
+                self.send_header('Location', f'https://github.com/Patrox43-debug/Corrientes-Debiles/releases/download/v{version_name}/{target_filename}')
                 self.end_headers()
                 return
 
