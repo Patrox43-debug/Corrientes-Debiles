@@ -1,9 +1,8 @@
 /**
  * QR Scanner Module - Corrientes Débiles
- * Maximiza la calidad y resolución permitida del sensor de la cámara del dispositivo
- * (hasta 4K UHD / 1080p con enfoque continuo).
- * Utiliza BarcodeDetector nativo por hardware cuando está disponible y jsQR a resolución
- * nativa 1:1 en la región de interés (ROI) sin pérdida de nitidez por reescalado.
+ * Escáner QR de alto rendimiento y máxima compatibilidad móvil / Android WebView.
+ * Utiliza captura HD con auto-enfoque continuo, análisis optimizado con jsQR (480-500px)
+ * y aceleración por hardware BarcodeDetector.
  */
 
 class QRScannerManager {
@@ -18,6 +17,8 @@ class QRScannerManager {
         this.ctx = null;
         this.lastScanTime = 0;
         this.scanCycle = 0;
+        this.isProcessing = false;
+        this.hasDetected = false;
         this.torchActive = false;
         this.actualResolution = { width: 0, height: 0 };
 
@@ -30,7 +31,7 @@ class QRScannerManager {
                 const formats = await BarcodeDetector.getSupportedFormats();
                 if (formats.includes('qr_code')) {
                     this.detector = new BarcodeDetector({ formats: ['qr_code'] });
-                    console.log('[QRScanner] BarcodeDetector nativo por hardware disponible.');
+                    console.log('[QRScanner] BarcodeDetector nativo por hardware activado.');
                 }
             } catch (err) {
                 this.detector = null;
@@ -42,7 +43,9 @@ class QRScannerManager {
         this.videoElement = videoElement;
         this.onDetect = onDetect;
         this.scanning = true;
+        this.hasDetected = false;
         this.torchActive = false;
+        this.isProcessing = false;
 
         if (!this.canvas) {
             this.canvas = document.createElement('canvas');
@@ -50,49 +53,34 @@ class QRScannerManager {
         }
 
         try {
-            // Configurar video para reproducción fluida en móviles
+            // Atributos obligatorios para reproducción fluida sin interacción previa en WebViews
             this.videoElement.setAttribute('autoplay', '');
             this.videoElement.setAttribute('muted', '');
             this.videoElement.setAttribute('playsinline', '');
+            this.videoElement.setAttribute('webkit-playsinline', '');
+            this.videoElement.playsInline = true;
+            this.videoElement.muted = true;
+            this.videoElement.autoplay = true;
 
-            // Restricciones de cámara en orden descendente: busca la MÁXIMA calidad que soporte el sensor
-            const qualityConstraints = [
-                // 1. Ultra Alta Definición 4K / UHD (ideal para sensores de 12MP/48MP/1080p+)
+            // Restricciones de cámara balanceadas para máxima compatibilidad y nitidez sin crasheos en Android
+            const constraintOptions = [
+                // 1. Alta Definición (1080p / 720p) con cámara trasera
                 {
                     video: {
                         facingMode: { ideal: 'environment' },
-                        width: { ideal: 3840 },
-                        height: { ideal: 2160 },
-                        frameRate: { ideal: 30 }
+                        width: { ideal: 1280, max: 1920 },
+                        height: { ideal: 720, max: 1080 }
                     },
                     audio: false
                 },
-                // 2. Full HD 1080p con cámara trasera
-                {
-                    video: {
-                        facingMode: { ideal: 'environment' },
-                        width: { ideal: 1920 },
-                        height: { ideal: 1080 }
-                    },
-                    audio: false
-                },
-                // 3. HD 720p con cámara trasera
-                {
-                    video: {
-                        facingMode: { ideal: 'environment' },
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 }
-                    },
-                    audio: false
-                },
-                // 4. Cámara trasera genérica
+                // 2. Cámara trasera estándar
                 {
                     video: {
                         facingMode: { ideal: 'environment' }
                     },
                     audio: false
                 },
-                // 5. Fallback a cualquier cámara disponible
+                // 3. Fallback universal: cualquier cámara del dispositivo
                 {
                     video: true,
                     audio: false
@@ -100,71 +88,78 @@ class QRScannerManager {
             ];
 
             let activeStream = null;
-            let lastError = null;
+            let lastErr = null;
 
-            for (const constraint of qualityConstraints) {
+            for (const option of constraintOptions) {
                 try {
-                    activeStream = await navigator.mediaDevices.getUserMedia(constraint);
+                    activeStream = await navigator.mediaDevices.getUserMedia(option);
                     if (activeStream) break;
                 } catch (e) {
-                    lastError = e;
+                    lastErr = e;
                 }
             }
 
             if (!activeStream) {
-                throw (lastError || new Error('No se pudo acceder al dispositivo de cámara.'));
+                throw (lastErr || new Error('No se pudo acceder a la cámara del dispositivo.'));
             }
 
             this.stream = activeStream;
             this.videoElement.srcObject = this.stream;
 
-            // Esperar que los metadatos de video carguen para conocer las dimensiones reales
+            // Intentar reproducir el video
+            try {
+                await this.videoElement.play();
+            } catch (playErr) {
+                console.warn('[QRScanner] play() inicial:', playErr);
+            }
+
+            // Esperar que el video esté entregando frames reales (videoWidth > 0)
             await new Promise((resolve) => {
-                if (this.videoElement.readyState >= HTMLMediaElement.HAVE_METADATA) {
-                    resolve();
-                } else {
-                    this.videoElement.onloadedmetadata = () => resolve();
-                }
+                let attempts = 0;
+                const checkDimensions = () => {
+                    attempts++;
+                    if (this.videoElement && this.videoElement.videoWidth > 0 && this.videoElement.videoHeight > 0) {
+                        resolve();
+                    } else if (attempts < 30) {
+                        setTimeout(checkDimensions, 50);
+                    } else {
+                        resolve(); // Salida por tiempo prudencial
+                    }
+                };
+                checkDimensions();
             });
 
-            await this.videoElement.play().catch(e => console.warn('[QRScanner] play() warning:', e));
-
-            // Optimización de hardware: Enfoque continuo automático y exposición
+            // Configurar enfoque continuo por hardware si la cámara lo soporta
             const track = this.stream.getVideoTracks()[0];
             let hasTorch = false;
 
             if (track) {
                 const settings = track.getSettings ? track.getSettings() : {};
                 this.actualResolution = {
-                    width: settings.width || this.videoElement.videoWidth,
-                    height: settings.height || this.videoElement.videoHeight
+                    width: settings.width || this.videoElement.videoWidth || 1280,
+                    height: settings.height || this.videoElement.videoHeight || 720
                 };
 
                 try {
                     const capabilities = track.getCapabilities ? track.getCapabilities() : {};
                     hasTorch = Boolean(capabilities.torch);
-                    const advancedConstraints = {};
 
-                    // Enfoque continuo para máxima nitidez de códigos QR pequeños o distantes
+                    const advanced = {};
                     if (capabilities.focusMode && capabilities.focusMode.includes('continuous')) {
-                        advancedConstraints.focusMode = 'continuous';
+                        advanced.focusMode = 'continuous';
                     }
                     if (capabilities.exposureMode && capabilities.exposureMode.includes('continuous')) {
-                        advancedConstraints.exposureMode = 'continuous';
+                        advanced.exposureMode = 'continuous';
                     }
-                    if (capabilities.whiteBalanceMode && capabilities.whiteBalanceMode.includes('continuous')) {
-                        advancedConstraints.whiteBalanceMode = 'continuous';
+                    if (Object.keys(advanced).length > 0) {
+                        await track.applyConstraints({ advanced: [advanced] }).catch(() => {});
                     }
-
-                    if (Object.keys(advancedConstraints).length > 0) {
-                        await track.applyConstraints({ advanced: [advancedConstraints] }).catch(() => {});
-                    }
-                } catch (err) {
-                    console.debug('[QRScanner] No se pudieron aplicar constraints avanzadas de foco:', err);
+                } catch (e) {
+                    console.debug('[QRScanner] Capabilities avanzadas no soportadas:', e);
                 }
             }
 
-            // Iniciar ciclo de escaneo continuo de alta velocidad
+            // Iniciar ciclo de escaneo continuo
             this.scanCycle = 0;
             this.scanFrame();
 
@@ -175,11 +170,11 @@ class QRScannerManager {
                 hasTorch: hasTorch
             };
         } catch (err) {
-            console.warn('[QRScanner] Error al iniciar cámara:', err);
+            console.error('[QRScanner] Error iniciando cámara:', err);
             this.scanning = false;
             return {
                 success: false,
-                error: 'No se pudo activar la cámara. Verifique los permisos de cámara en los ajustes del dispositivo.'
+                error: 'No se pudo acceder a la cámara. Verifique que los permisos estén habilitados en los ajustes de su teléfono.'
             };
         }
     }
@@ -206,13 +201,16 @@ class QRScannerManager {
             this.torchActive = Boolean(enabled);
             return true;
         } catch (e) {
-            console.warn('[QRScanner] Error al conmutar linterna:', e);
+            console.warn('[QRScanner] Error en linterna:', e);
             return false;
         }
     }
 
     stopCamera() {
         this.scanning = false;
+        this.hasDetected = false;
+        this.isProcessing = false;
+
         if (this.animFrameId) {
             cancelAnimationFrame(this.animFrameId);
             this.animFrameId = null;
@@ -231,97 +229,131 @@ class QRScannerManager {
         }
     }
 
-    scanFrame() {
-        if (!this.scanning || !this.videoElement) return;
+    playBeep() {
+        try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.frequency.setValueAtTime(1050, ctx.currentTime);
+            gain.gain.setValueAtTime(0.18, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.14);
+            osc.start(ctx.currentTime);
+            osc.stop(ctx.currentTime + 0.14);
+        } catch (e) {}
+    }
+
+    async scanFrame() {
+        if (!this.scanning || !this.videoElement || this.hasDetected) return;
+
+        // Evitar solapamiento de procesamiento pesado entre frames
+        if (this.isProcessing) {
+            this.animFrameId = requestAnimationFrame(() => this.scanFrame());
+            return;
+        }
 
         const now = performance.now();
-        // Frecuencia optimizada: escanea cada ~65ms (~15 fps de análisis)
-        if (now - this.lastScanTime >= 65) {
-            this.lastScanTime = now;
-            this.scanCycle++;
+        // Frecuencia fluida: ~50ms (~20 intentos por segundo)
+        if (now - this.lastScanTime < 50) {
+            this.animFrameId = requestAnimationFrame(() => this.scanFrame());
+            return;
+        }
 
-            if (this.videoElement.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
-                const vw = this.videoElement.videoWidth;
-                const vh = this.videoElement.videoHeight;
+        this.lastScanTime = now;
+        this.scanCycle++;
 
-                if (vw > 0 && vh > 0) {
-                    let detectedCode = null;
+        if (this.videoElement.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+            this.animFrameId = requestAnimationFrame(() => this.scanFrame());
+            return;
+        }
 
-                    // 1. PRIMERA PRIORIDAD: BarcodeDetector nativo por hardware (procesa frame completo a resolución nativa)
-                    if (this.detector) {
-                        try {
-                            this.detector.detect(this.videoElement).then(barcodes => {
-                                if (barcodes && barcodes.length > 0 && barcodes[0].rawValue) {
-                                    this.handleDetectedCode(barcodes[0].rawValue);
-                                }
-                            }).catch(() => {});
-                        } catch (e) {}
+        const vw = this.videoElement.videoWidth;
+        const vh = this.videoElement.videoHeight;
+
+        if (vw <= 0 || vh <= 0) {
+            this.animFrameId = requestAnimationFrame(() => this.scanFrame());
+            return;
+        }
+
+        this.isProcessing = true;
+        let detectedCode = null;
+
+        try {
+            // ESTRATEGIA 1: BarcodeDetector nativo por hardware (acelerado por GPU / ML Kit)
+            if (this.detector) {
+                try {
+                    const barcodes = await this.detector.detect(this.videoElement);
+                    if (barcodes && barcodes.length > 0 && barcodes[0].rawValue && !this.hasDetected) {
+                        detectedCode = barcodes[0].rawValue;
+                    }
+                } catch (e) {
+                    // Fallback a jsQR si falla el detector nativo
+                }
+            }
+
+            // ESTRATEGIA 2: jsQR optimizado con dimensiones de 480px (nitidez y velocidad <12ms)
+            if (!detectedCode && typeof jsQR !== 'undefined' && !this.hasDetected) {
+                // Alternamos entre:
+                // Ciclo Impar: Región Central (ROI) con zoom óptico (480x480)
+                // Ciclo Par: Encuadre Completo escalado a 480px
+                const isRoi = (this.scanCycle % 2 !== 0);
+
+                if (isRoi) {
+                    // Tomamos el 72% central de la cámara donde apunta el visor
+                    const cropSize = Math.floor(Math.min(vw, vh) * 0.72);
+                    const sx = Math.floor((vw - cropSize) / 2);
+                    const sy = Math.floor((vh - cropSize) / 2);
+                    const targetDim = 480;
+
+                    if (this.canvas.width !== targetDim || this.canvas.height !== targetDim) {
+                        this.canvas.width = targetDim;
+                        this.canvas.height = targetDim;
                     }
 
-                    // 2. SEGUNDA PRIORIDAD: jsQR de máxima nitidez óptica 1:1 en la Región de Interés (ROI Central)
-                    if (typeof jsQR !== 'undefined') {
-                        try {
-                            // En ciclos impares: analiza el centro del visor al 100% de resolución nativa del sensor (CERO pixelado)
-                            // En ciclos pares: analiza el encuadre completo en alta resolución (hasta 1280px)
-                            const isRoiScan = (this.scanCycle % 2 !== 0);
+                    this.ctx.drawImage(this.videoElement, sx, sy, cropSize, cropSize, 0, 0, targetDim, targetDim);
+                    const imgData = this.ctx.getImageData(0, 0, targetDim, targetDim);
+                    const code = jsQR(imgData.data, targetDim, targetDim, {
+                        inversionAttempts: (this.scanCycle % 4 === 1) ? 'dontInvert' : 'attemptBoth'
+                    });
 
-                            if (isRoiScan) {
-                                // Región central donde el usuario apunta el visor
-                                const cropSize = Math.min(vw, vh, 1080);
-                                const sx = Math.floor((vw - cropSize) / 2);
-                                const sy = Math.floor((vh - cropSize) / 2);
+                    if (code && code.data) {
+                        detectedCode = code.data;
+                    }
+                } else {
+                    // Escaneo amplio del encuadre completo (por si el código está descentrado)
+                    const targetW = 480;
+                    const scale = targetW / vw;
+                    const targetH = Math.floor(vh * scale);
 
-                                if (this.canvas.width !== cropSize || this.canvas.height !== cropSize) {
-                                    this.canvas.width = cropSize;
-                                    this.canvas.height = cropSize;
-                                }
-
-                                // Copia 1:1 directa sin reducción de escala
-                                this.ctx.drawImage(this.videoElement, sx, sy, cropSize, cropSize, 0, 0, cropSize, cropSize);
-                                const imgData = this.ctx.getImageData(0, 0, cropSize, cropSize);
-                                const code = jsQR(imgData.data, cropSize, cropSize, {
-                                    inversionAttempts: 'attemptBoth'
-                                });
-
-                                if (code && code.data) {
-                                    detectedCode = code.data;
-                                }
-                            } else {
-                                // Escaneo amplio del encuadre completo
-                                const maxDim = 1280;
-                                const scale = Math.min(1, maxDim / Math.max(vw, vh));
-                                const cw = Math.floor(vw * scale);
-                                const ch = Math.floor(vh * scale);
-
-                                if (this.canvas.width !== cw || this.canvas.height !== ch) {
-                                    this.canvas.width = cw;
-                                    this.canvas.height = ch;
-                                }
-
-                                this.ctx.drawImage(this.videoElement, 0, 0, cw, ch);
-                                const imgData = this.ctx.getImageData(0, 0, cw, ch);
-                                const code = jsQR(imgData.data, cw, ch, {
-                                    inversionAttempts: 'attemptBoth'
-                                });
-
-                                if (code && code.data) {
-                                    detectedCode = code.data;
-                                }
-                            }
-                        } catch (err) {
-                            console.warn('[QRScanner] Error en análisis jsQR:', err);
-                        }
+                    if (this.canvas.width !== targetW || this.canvas.height !== targetH) {
+                        this.canvas.width = targetW;
+                        this.canvas.height = targetH;
                     }
 
-                    if (detectedCode) {
-                        this.handleDetectedCode(detectedCode);
-                        return; // Se detiene al detectar con éxito
+                    this.ctx.drawImage(this.videoElement, 0, 0, targetW, targetH);
+                    const imgData = this.ctx.getImageData(0, 0, targetW, targetH);
+                    const code = jsQR(imgData.data, targetW, targetH, {
+                        inversionAttempts: (this.scanCycle % 4 === 0) ? 'attemptBoth' : 'dontInvert'
+                    });
+
+                    if (code && code.data) {
+                        detectedCode = code.data;
                     }
                 }
             }
+        } catch (err) {
+            console.warn('[QRScanner] Excepción en scanFrame:', err);
+        } finally {
+            this.isProcessing = false;
         }
 
-        if (this.scanning) {
+        if (detectedCode && !this.hasDetected) {
+            this.handleDetectedCode(detectedCode);
+            return;
+        }
+
+        if (this.scanning && !this.hasDetected) {
             this.animFrameId = requestAnimationFrame(() => this.scanFrame());
         }
     }
@@ -336,41 +368,35 @@ class QRScannerManager {
                 img.onload = async () => {
                     let detectedText = null;
 
-                    // 1. Intentar BarcodeDetector nativo
+                    // 1. Probar BarcodeDetector nativo
                     if (this.detector) {
                         try {
                             const barcodes = await this.detector.detect(img);
-                            if (barcodes && barcodes.length > 0) {
+                            if (barcodes && barcodes.length > 0 && barcodes[0].rawValue) {
                                 detectedText = barcodes[0].rawValue;
                             }
                         } catch (e) {}
                     }
 
-                    // 2. Intentar jsQR en alta resolución (hasta 2400px para máxima nitidez)
+                    // 2. Probar con jsQR en múltiples dimensiones óptimas
                     if (!detectedText && typeof jsQR !== 'undefined') {
-                        try {
-                            const canvas = document.createElement('canvas');
-                            const ctx = canvas.getContext('2d', { willReadFrequently: true });
-                            const maxDim = 2400;
-                            let w = img.width;
-                            let h = img.height;
-                            if (Math.max(w, h) > maxDim) {
-                                const r = maxDim / Math.max(w, h);
-                                w = Math.floor(w * r);
-                                h = Math.floor(h * r);
-                            }
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+                        for (const targetDim of [600, 800, 480, 1000]) {
+                            const scale = Math.min(1, targetDim / Math.max(img.width, img.height));
+                            const w = Math.floor(img.width * scale);
+                            const h = Math.floor(img.height * scale);
+
                             canvas.width = w;
                             canvas.height = h;
                             ctx.drawImage(img, 0, 0, w, h);
                             const imgData = ctx.getImageData(0, 0, w, h);
-                            const code = jsQR(imgData.data, w, h, {
-                                inversionAttempts: 'attemptBoth'
-                            });
+                            const code = jsQR(imgData.data, w, h, { inversionAttempts: 'attemptBoth' });
                             if (code && code.data) {
                                 detectedText = code.data;
+                                break;
                             }
-                        } catch (err) {
-                            console.warn('[QRScanner] Error leyendo archivo con jsQR:', err);
                         }
                     }
 
@@ -389,15 +415,29 @@ class QRScannerManager {
     }
 
     handleDetectedCode(raw) {
-        let clean = (raw || '').trim();
-        if (!clean) return;
+        if (this.hasDetected) return;
+        this.hasDetected = true;
 
-        // Vibración háptica en dispositivos móviles al detectar el código
-        if ('vibrate' in navigator) {
-            try { navigator.vibrate(100); } catch (e) {}
+        let clean = (raw || '').trim();
+        if (!clean) {
+            this.hasDetected = false;
+            return;
         }
 
-        // 1. Si contiene parámetro de URL tipo ?qr=EQ-...
+        // Feedback de detección: Sonido Beep y Vibración háptica
+        this.playBeep();
+        if ('vibrate' in navigator) {
+            try { navigator.vibrate([70, 40, 70]); } catch (e) {}
+        }
+
+        // Iluminar el retículo en verde de confirmación
+        const reticle = document.querySelector('.scanner-reticle');
+        if (reticle) {
+            reticle.style.borderColor = '#10b981';
+            reticle.style.boxShadow = '0 0 0 9999px rgba(0, 0, 0, 0.6), 0 0 25px #10b981';
+        }
+
+        // 1. Extraer si es URL tipo https://.../?qr=EQ-UPS-001
         if (clean.includes('qr=')) {
             try {
                 const url = new URL(clean, window.location.origin);
@@ -409,7 +449,7 @@ class QRScannerManager {
             clean = clean.split('#').pop();
         }
 
-        // 2. Extraer código de equipo canónico (EQ-XXX-000) si viene embebido en texto o URL
+        // 2. Extraer código canónico EQ-XXX-000 si viene dentro de una frase o URL
         const match = clean.match(/EQ-[A-Z0-9]+-\d+/i);
         if (match) {
             clean = match[0].toUpperCase();

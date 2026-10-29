@@ -317,7 +317,7 @@ class AppController {
         const firstName = (this.currentUser?.nombre || 'Usuario').split(' ')[0];
         const roleName = isAdmin ? 'Administrador' : 'Técnico';
         const isLocal = !window.appStorage || window.appStorage.getMode() === 'local';
-        const currentVer = (window.APP_VERSION || '1.0.12').replace(/^[vV]/, '');
+        const currentVer = (window.APP_VERSION || '1.0.13').replace(/^[vV]/, '');
         const apkFilename = `CDmantencion_v${currentVer}.apk`;
 
         navActions.innerHTML = `
@@ -1169,6 +1169,21 @@ class AppController {
                 this.renderDetailModal(eq);
                 this.openModal('equipo-detail-modal');
                 this.showToast(`✓ Ficha cargada (Local): ${eq.nombre} (${eq.codigo_qr})`, 'success');
+                return;
+            }
+        }
+
+        // 3. Fallback adicional en la lista cargada en memoria
+        if (!found && Array.isArray(this.equipos) && this.equipos.length > 0) {
+            const eq = this.equipos.find(e => 
+                (e.codigo_qr && e.codigo_qr.toUpperCase() === cleanCode.toUpperCase()) ||
+                (e.numero_serie && e.numero_serie.toUpperCase() === cleanCode.toUpperCase()) ||
+                (e.nombre && e.nombre.toUpperCase() === cleanCode.toUpperCase())
+            );
+            if (eq) {
+                this.renderDetailModal(eq);
+                this.openModal('equipo-detail-modal');
+                this.showToast(`✓ Ficha cargada: ${eq.nombre} (${eq.codigo_qr})`, 'success');
                 return;
             }
         }
@@ -2138,7 +2153,7 @@ class AppController {
             if (!res.ok) throw new Error('HTTP ' + res.status);
             const data = await res.json();
             const remoteTag = (data.tag_name || '').trim().replace(/^[vV]/, '');
-            const currentVer = (window.APP_VERSION || '1.0.12').replace(/^[vV]/, '');
+            const currentVer = (window.APP_VERSION || '1.0.13').replace(/^[vV]/, '');
 
             if (this.isNewerVersion(remoteTag, currentVer)) {
                 let apkUrl = 'https://github.com/Patrox43-debug/Corrientes-Debiles/releases/latest/download/CDmantencion.apk';
