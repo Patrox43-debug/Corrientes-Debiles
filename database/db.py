@@ -1,6 +1,7 @@
 import sqlite3
 import os
 import hashlib
+import re
 from datetime import datetime
 
 try:
@@ -456,13 +457,24 @@ def get_equipo_by_id(equipo_id: int):
     return equipo
 
 def get_equipo_by_code(codigo_qr: str):
+    if not codigo_qr:
+        return None
+    raw_code = str(codigo_qr).strip()
+    match = re.search(r'EQ-[A-Za-z0-9]+-\d+', raw_code)
+    extracted_code = match.group(0).upper() if match else raw_code
+
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("""
         SELECT id FROM equipos 
         WHERE codigo_qr = ? OR LOWER(codigo_qr) = LOWER(?)
+           OR codigo_qr = ? OR LOWER(codigo_qr) = LOWER(?)
            OR numero_serie = ? OR LOWER(numero_serie) = LOWER(?)
-    """, (codigo_qr, codigo_qr, codigo_qr, codigo_qr))
+           OR LOWER(numero_serie) = LOWER(?)
+           OR caracteristicas LIKE ?
+        ORDER BY id ASC
+        LIMIT 1
+    """, (raw_code, raw_code, extracted_code, extracted_code, raw_code, raw_code, extracted_code, f"%{raw_code}%"))
     row = cursor.fetchone()
     conn.close()
     if row:

@@ -1784,12 +1784,29 @@ class LocalDatabase {
     }
 
     getEquipoByCode(code) {
-        const cleanCode = (code || '').trim().toUpperCase();
+        if (!code) return null;
+        let cleanCode = code.toString().trim();
+        if (cleanCode.includes('qr=')) {
+            try {
+                const url = new URL(cleanCode, window.location.origin);
+                cleanCode = url.searchParams.get('qr') || cleanCode;
+            } catch (e) {}
+        } else if (cleanCode.includes('/equipo/')) {
+            cleanCode = cleanCode.split('/equipo/').pop().split(/[?#]/)[0];
+        }
+        const eqMatch = cleanCode.match(/EQ-[A-Z0-9]+-\d+/i);
+        const matchCode = eqMatch ? eqMatch[0].toUpperCase() : cleanCode.toUpperCase();
+        const upperRaw = cleanCode.toUpperCase();
+
         const equipos = this.getEquiposRaw();
-        const eq = equipos.find(e => 
-            (e.codigo_qr || '').toUpperCase() === cleanCode || 
-            (e.numero_serie || '').toUpperCase() === cleanCode
-        );
+        const eq = equipos.find(e => {
+            const qr = (e.codigo_qr || '').toUpperCase();
+            const sn = (e.numero_serie || '').toUpperCase();
+            const chars = (e.caracteristicas || '').toUpperCase();
+            return qr === matchCode || qr === upperRaw ||
+                   sn === upperRaw || (sn && sn === matchCode) ||
+                   (upperRaw.length >= 4 && chars.includes(upperRaw));
+        });
         if (!eq) return null;
         return this.getEquipoById(eq.id);
     }
