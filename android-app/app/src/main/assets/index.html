@@ -11,6 +11,29 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <script>
+        // Limpieza forzada de cachés antiguas de Service Worker
+        if ('caches' in window) {
+            caches.keys().then(keys => {
+                keys.forEach(k => {
+                    if (k !== 'corrientes-debiles-v5') caches.delete(k);
+                });
+            });
+        }
+        // Limpieza de datos de prueba obsoletos en localStorage
+        try {
+            const rawEq = localStorage.getItem('cd_local_equipos');
+            if (rawEq && (rawEq.indexOf('EQ-CCTV') !== -1 || rawEq.indexOf('EQ-ACS') !== -1 || !localStorage.getItem('cd_ups_v5'))) {
+                localStorage.removeItem('cd_local_equipos');
+                localStorage.removeItem('cd_local_mantenciones');
+                localStorage.removeItem('cd_db_seeded_v2');
+                localStorage.removeItem('cd_db_seeded_version');
+                localStorage.removeItem('auth_user');
+                localStorage.removeItem('auth_token');
+                localStorage.setItem('cd_ups_v5', 'true');
+            }
+        } catch(e) {}
+    </script>
 </head>
 <body>
 
@@ -98,13 +121,23 @@
                         <span class="mode-dot" id="login-mode-dot"></span>
                         <span id="login-mode-label">Modo Local</span>
                     </button>
-                    <a href="/CDmantencion.apk" download="CDmantencion.apk" class="btn btn-outline-orange" style="font-size: 0.75rem; padding: 0.35rem 0.65rem; text-decoration: none;" title="Descargar APK CDmantencion para Android">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
-                            <line x1="12" y1="18" x2="12.01" y2="18"></line>
-                        </svg>
-                        Descargar APK (CDmantencion)
-                    </a>
+                    <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;">
+                        <a href="/reset" class="btn btn-outline-orange" style="font-size: 0.75rem; padding: 0.35rem 0.65rem; text-decoration: none;" title="Limpiar caché y recargar datos">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M23 4v6h-6"></path>
+                                <path d="M1 20v-6h6"></path>
+                                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                            </svg>
+                            Recargar Datos
+                        </a>
+                        <a href="/CDmantencion.apk" download="CDmantencion.apk" class="btn btn-outline-orange" style="font-size: 0.75rem; padding: 0.35rem 0.65rem; text-decoration: none;" title="Descargar APK CDmantencion para Android">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+                                <line x1="12" y1="18" x2="12.01" y2="18"></line>
+                            </svg>
+                            Descargar APK
+                        </a>
+                    </div>
                 </div>
             </div>
         </section>
@@ -210,15 +243,19 @@
                         </button>
                     </div>
 
+                    <a href="/reset" class="btn btn-outline-orange" style="text-decoration:none; display:inline-flex; align-items:center; gap:0.4rem;" title="Limpiar caché local y recargar datos oficiales">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M23 4v6h-6"></path>
+                            <path d="M1 20v-6h6"></path>
+                            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                        </svg>
+                        Recargar Datos
+                    </a>
                     <button class="btn btn-primary" id="open-new-equipo-btn">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                             <line x1="12" y1="5" x2="12" y2="19"></line>
                             <line x1="5" y1="12" x2="19" y2="12"></line>
                         </svg>
-                        Nuevo Equipo
-                    </button>
-                </div>
-            </div>
                         Nuevo Equipo
                     </button>
                 </div>

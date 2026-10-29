@@ -69,6 +69,60 @@ class CustomRequestHandler(http.server.SimpleHTTPRequestHandler):
         path = parsed_url.path
         query = urllib.parse.parse_qs(parsed_url.query)
 
+        # Endpoint especial para limpiar caché y recargar
+        if path == '/reset':
+            html = """<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Actualizando Corrientes Débiles...</title>
+    <style>
+        body { background: #0c0d0e; color: #f97316; font-family: system-ui, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+        .spinner { width: 50px; height: 50px; border: 4px solid #222; border-top-color: #f97316; border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 20px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div class="spinner"></div>
+    <h2>Actualizando datos y limpiando caché...</h2>
+    <p style="color:#aaa;">Eliminando Service Worker y datos de prueba obsoletos...</p>
+    <script>
+        async function clean() {
+            if ('serviceWorker' in navigator) {
+                try {
+                    const regs = await navigator.serviceWorker.getRegistrations();
+                    for (let reg of regs) {
+                        await reg.unregister();
+                    }
+                } catch(e) {}
+            }
+            if ('caches' in window) {
+                try {
+                    const keys = await caches.keys();
+                    for (let k of keys) {
+                        await caches.delete(k);
+                    }
+                } catch(e) {}
+            }
+            try {
+                localStorage.clear();
+                sessionStorage.clear();
+            } catch(e) {}
+            setTimeout(() => {
+                window.location.replace('/?v=' + Date.now());
+            }, 500);
+        }
+        clean();
+    </script>
+</body>
+</html>"""
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/html; charset=utf-8')
+            self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate')
+            self.end_headers()
+            self.wfile.write(html.encode('utf-8'))
+            return
+
         # API Endpoints
         if path.startswith('/api/'):
             # Health check
