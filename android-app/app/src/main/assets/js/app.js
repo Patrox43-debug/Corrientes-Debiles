@@ -314,20 +314,11 @@ class AppController {
 
         const initial = this.currentUser?.nombre ? this.currentUser.nombre.charAt(0).toUpperCase() : 'U';
         const isAdmin = this.currentUser?.rol === 'admin';
-
-        const adminButtonHtml = isAdmin ? `
-            <button class="btn btn-outline-orange" id="admin-panel-nav-btn" title="Panel de Administración y Gestión de Usuarios" onclick="app.openAdminModal()">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                    <circle cx="9" cy="7" r="4"></circle>
-                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                </svg>
-                <span>Administración</span>
-            </button>
-        ` : '';
-
+        const firstName = (this.currentUser?.nombre || 'Usuario').split(' ')[0];
+        const roleName = isAdmin ? 'Administrador' : 'Técnico';
         const isLocal = !window.appStorage || window.appStorage.getMode() === 'local';
+        const currentVer = (window.APP_VERSION || '1.0.11').replace(/^[vV]/, '');
+        const apkFilename = `CDmantencion_v${currentVer}.apk`;
 
         navActions.innerHTML = `
             <button type="button" class="btn-storage-mode" id="nav-storage-mode-btn" onclick="app.openCloudModal()" title="Configuración de Almacenamiento Local / Nube">
@@ -335,45 +326,161 @@ class AppController {
                 <span>${isLocal ? 'Local' : 'Nube'}</span>
             </button>
 
-            <a href="/CorrientesDebiles.apk" download="CorrientesDebiles.apk" class="btn btn-outline-orange" style="text-decoration: none; font-size: 0.78rem; padding: 0.35rem 0.65rem;" title="Descargar APK para Android">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
-                    <line x1="12" y1="18" x2="12.01" y2="18"></line>
-                </svg>
-                <span>APK</span>
-            </a>
-
-            <button class="btn btn-outline-orange" id="scan-qr-nav-btn" onclick="app.openQrScanner()">
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <rect x="3" y="3" width="7" height="7"></rect>
-                    <rect x="14" y="3" width="7" height="7"></rect>
-                    <rect x="14" y="14" width="7" height="7"></rect>
-                    <rect x="3" y="14" width="7" height="7"></rect>
-                </svg>
-                Escanear QR
-            </button>
-
-            ${adminButtonHtml}
-
-            <div class="user-pill" title="Usuario Autenticado (${isAdmin ? 'Administrador' : 'Técnico'})">
-                <div class="user-avatar">${initial}</div>
-                <div>
-                    <div style="font-weight: 600; line-height: 1.1; color: #fff;">
-                        ${this.currentUser.nombre.split(' ')[0]}
-                        ${isAdmin ? '<span style="font-size: 0.68rem; color: var(--orange-primary); font-weight: 700; margin-left: 2px;">(Admin)</span>' : ''}
+            <!-- Menú Desplegable Esquina Superior Derecha -->
+            <div class="nav-dropdown-wrapper" id="nav-dropdown-wrapper">
+                <button type="button" class="nav-dropdown-trigger" id="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false" onclick="app.toggleNavMenu(event)" title="Opciones y cuenta de usuario">
+                    <div class="user-avatar">${initial}</div>
+                    <div class="nav-trigger-info">
+                        <span class="nav-trigger-name">${firstName}</span>
+                        <span class="nav-trigger-role">${isAdmin ? 'Admin' : 'Técnico'}</span>
                     </div>
-                    <div class="user-rut">${this.currentUser.rut}</div>
+                    <svg class="nav-chevron-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="6 9 12 15 18 9"></polyline>
+                    </svg>
+                </button>
+
+                <div class="nav-dropdown-menu" id="nav-dropdown-menu" role="menu">
+                    <!-- Cabecera de Usuario -->
+                    <div class="dropdown-user-header">
+                        <div class="dropdown-user-avatar">${initial}</div>
+                        <div class="dropdown-user-meta">
+                            <div class="dropdown-user-name">${this.escapeHtml(this.currentUser?.nombre || 'Usuario')}</div>
+                            <div class="dropdown-user-rut">${this.escapeHtml(this.currentUser?.rut || '')}</div>
+                            <span class="dropdown-user-badge ${isAdmin ? 'badge-admin' : 'badge-tech'}">${roleName}</span>
+                        </div>
+                    </div>
+
+                    <div class="dropdown-divider"></div>
+
+                    <!-- Escanear QR -->
+                    <button type="button" class="dropdown-item" id="scan-qr-nav-btn" onclick="app.closeNavMenu(); app.openQrScanner();" role="menuitem">
+                        <div class="dropdown-item-icon">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="3" width="7" height="7"></rect>
+                                <rect x="14" y="3" width="7" height="7"></rect>
+                                <rect x="14" y="14" width="7" height="7"></rect>
+                                <rect x="3" y="14" width="7" height="7"></rect>
+                            </svg>
+                        </div>
+                        <div class="dropdown-item-content">
+                            <span class="dropdown-item-title">Escanear Código QR</span>
+                            <span class="dropdown-item-subtitle">Cámara o archivo para ficha</span>
+                        </div>
+                    </button>
+
+                    <!-- Descargar APK -->
+                    <a href="/CDmantencion.apk" download="${apkFilename}" class="dropdown-item" id="apk-download-nav-btn" onclick="app.closeNavMenu();" role="menuitem">
+                        <div class="dropdown-item-icon">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+                                <line x1="12" y1="18" x2="12.01" y2="18"></line>
+                            </svg>
+                        </div>
+                        <div class="dropdown-item-content">
+                            <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;">
+                                <span class="dropdown-item-title">Descargar APK</span>
+                                <span class="dropdown-badge-pill">v${currentVer}</span>
+                            </div>
+                            <span class="dropdown-item-subtitle">${apkFilename}</span>
+                        </div>
+                    </a>
+
+                    <!-- Buscar Actualización GitHub -->
+                    <button type="button" class="dropdown-item" id="apk-update-nav-btn" onclick="app.closeNavMenu(); app.checkForUpdates(true);" role="menuitem">
+                        <div class="dropdown-item-icon">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="23 4 23 10 17 10"></polyline>
+                                <polyline points="1 20 1 14 7 14"></polyline>
+                                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                            </svg>
+                        </div>
+                        <div class="dropdown-item-content">
+                            <span class="dropdown-item-title">Buscar Actualizaciones</span>
+                            <span class="dropdown-item-subtitle">Verificar última versión en GitHub</span>
+                        </div>
+                    </button>
+
+                    ${isAdmin ? `
+                    <div class="dropdown-divider"></div>
+
+                    <!-- Administración de Usuarios -->
+                    <button type="button" class="dropdown-item" id="admin-panel-nav-btn" onclick="app.closeNavMenu(); app.openAdminModal();" role="menuitem">
+                        <div class="dropdown-item-icon" style="color: var(--orange-primary);">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="9" cy="7" r="4"></circle>
+                                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                            </svg>
+                        </div>
+                        <div class="dropdown-item-content">
+                            <span class="dropdown-item-title">Administración</span>
+                            <span class="dropdown-item-subtitle">Gestión de usuarios y accesos</span>
+                        </div>
+                    </button>
+                    ` : ''}
+
+                    <!-- Sincronización & Nube -->
+                    <button type="button" class="dropdown-item" id="cloud-settings-nav-btn" onclick="app.closeNavMenu(); app.openCloudModal();" role="menuitem">
+                        <div class="dropdown-item-icon">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+                                <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
+                                <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
+                            </svg>
+                        </div>
+                        <div class="dropdown-item-content">
+                            <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;">
+                                <span class="dropdown-item-title">Base de Datos & Nube</span>
+                                <span class="dropdown-badge-mode ${isLocal ? 'mode-local' : 'mode-cloud'}">${isLocal ? 'Local' : 'Nube'}</span>
+                            </div>
+                            <span class="dropdown-item-subtitle">Sincronización y respaldos</span>
+                        </div>
+                    </button>
+
+                    <div class="dropdown-divider"></div>
+
+                    <!-- Cerrar Sesión -->
+                    <button type="button" class="dropdown-item dropdown-item-danger" id="logout-nav-btn" onclick="app.closeNavMenu(); app.handleLogout();" role="menuitem">
+                        <div class="dropdown-item-icon">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                                <polyline points="16 17 21 12 16 7"></polyline>
+                                <line x1="21" y1="12" x2="9" y2="12"></line>
+                            </svg>
+                        </div>
+                        <div class="dropdown-item-content">
+                            <span class="dropdown-item-title">Cerrar Sesión</span>
+                            <span class="dropdown-item-subtitle">Salir del sistema</span>
+                        </div>
+                    </button>
                 </div>
             </div>
-
-            <button class="btn btn-secondary btn-icon-only" title="Cerrar Sesión" onclick="app.handleLogout()">
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                    <polyline points="16 17 21 12 16 7"></polyline>
-                    <line x1="21" y1="12" x2="9" y2="12"></line>
-                </svg>
-            </button>
         `;
+    }
+
+    toggleNavMenu(event) {
+        if (event) {
+            event.stopPropagation();
+        }
+        const wrapper = document.getElementById('nav-dropdown-wrapper');
+        const trigger = document.getElementById('nav-dropdown-trigger');
+        if (!wrapper) return;
+        const isOpen = wrapper.classList.toggle('active');
+        if (trigger) {
+            trigger.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        }
+    }
+
+    closeNavMenu() {
+        const wrapper = document.getElementById('nav-dropdown-wrapper');
+        const trigger = document.getElementById('nav-dropdown-trigger');
+        if (wrapper && wrapper.classList.contains('active')) {
+            wrapper.classList.remove('active');
+            if (trigger) {
+                trigger.setAttribute('aria-expanded', 'false');
+            }
+        }
     }
 
     /* ==========================================================================
@@ -1929,6 +2036,22 @@ class AppController {
                 });
             }
         });
+
+        // Close nav dropdown menu when clicking outside or pressing Escape
+        document.addEventListener('click', (e) => {
+            const wrapper = document.getElementById('nav-dropdown-wrapper');
+            if (wrapper && wrapper.classList.contains('active')) {
+                if (!wrapper.contains(e.target)) {
+                    this.closeNavMenu();
+                }
+            }
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                this.closeNavMenu();
+            }
+        });
     }
 
     /* ==========================================================================
@@ -1964,7 +2087,7 @@ class AppController {
             if (!res.ok) throw new Error('HTTP ' + res.status);
             const data = await res.json();
             const remoteTag = (data.tag_name || '').trim().replace(/^[vV]/, '');
-            const currentVer = (window.APP_VERSION || '1.0.10').replace(/^[vV]/, '');
+            const currentVer = (window.APP_VERSION || '1.0.11').replace(/^[vV]/, '');
 
             if (this.isNewerVersion(remoteTag, currentVer)) {
                 let apkUrl = 'https://github.com/Patrox43-debug/Corrientes-Debiles/releases/latest/download/CDmantencion.apk';
