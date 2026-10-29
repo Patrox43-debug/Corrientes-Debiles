@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Inventario y Mantención | Corrientes Débiles</title>
-    <link rel="stylesheet" href="./css/style.css?v=1.0.5">
+    <link rel="stylesheet" href="./css/style.css?v=1.0.6">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23f97316'><path d='M13 2L3 14h8v8l10-12h-8V2z'/></svg>">
     <link rel="manifest" href="./manifest.json">
     <meta name="theme-color" content="#f97316">
@@ -339,22 +339,82 @@
          MODAL 2: VER / IMPRIMIR CÓDIGO QR Y ETIQUETA
          ======================================================================= -->
     <div class="modal-backdrop" id="qr-view-modal">
-        <div class="modal-dialog" style="max-width: 480px;">
+        <div class="modal-dialog" style="max-width: 520px;">
             <div class="modal-header">
                 <div class="modal-title">
-                    Código QR de Identificación
+                    Etiqueta & Código QR de Identificación
                 </div>
                 <button type="button" class="modal-close-btn" onclick="app.closeModal('qr-view-modal')">&times;</button>
             </div>
             <div class="modal-body">
                 <div class="qr-sticker print-only-sticker" id="printable-qr-card">
-                    <div class="sticker-brand">⚡ SISTEMA CORRIENTES DÉBILES</div>
-                    <div style="font-size: 0.78rem; color: #444; margin-top: 2px;" id="qr-modal-location">-</div>
-                    <div class="qr-canvas-holder" id="qr-code-canvas-container"></div>
-                    <div class="sticker-code" id="qr-modal-code">EQ-000</div>
-                    <div style="margin-top: 0.5rem; font-weight: 700; font-size: 0.95rem;" id="qr-modal-title">Nombre Equipo</div>
-                    <div style="font-size: 0.8rem; color: #333;" id="qr-modal-model">Marca / Modelo</div>
-                    <div style="font-size: 0.72rem; color: #666; margin-top: 0.35rem;" id="qr-modal-install">Instalado: -</div>
+                    <!-- Encabezado de Etiqueta -->
+                    <div class="sticker-header">
+                        <div class="sticker-brand">⚡ CORRIENTES DÉBILES</div>
+                        <div class="sticker-subbrand">FICHA TÉCNICA & CONTROL DE EQUIPAMIENTO</div>
+                    </div>
+
+                    <!-- Sección QR y Código -->
+                    <div class="sticker-qr-section">
+                        <div class="qr-canvas-holder" id="qr-code-canvas-container"></div>
+                        <div class="sticker-code" id="qr-modal-code">EQ-UPS-001</div>
+                    </div>
+
+                    <!-- Identificación Principal -->
+                    <div class="sticker-title-box">
+                        <div class="sticker-title" id="qr-modal-title">Nombre Equipo</div>
+                        <div class="sticker-status-badge status-operativo" id="qr-modal-status">OPERATIVO</div>
+                    </div>
+
+                    <!-- Ficha Completa de Atributos -->
+                    <div class="sticker-data-grid">
+                        <div class="sticker-data-row">
+                            <span class="sticker-data-label">N° de Serie</span>
+                            <span class="sticker-data-val mono-val" id="qr-modal-serie">-</span>
+                        </div>
+                        <div class="sticker-data-row">
+                            <span class="sticker-data-label">Capacidad</span>
+                            <span class="sticker-data-val badge-val" id="qr-modal-capacidad">-</span>
+                        </div>
+                        <div class="sticker-data-row">
+                            <span class="sticker-data-label">Marca / Modelo</span>
+                            <span class="sticker-data-val" id="qr-modal-brand-model">-</span>
+                        </div>
+                        <div class="sticker-data-row">
+                            <span class="sticker-data-label">Recinto</span>
+                            <span class="sticker-data-val bold-val" id="qr-modal-recinto-ubi">-</span>
+                        </div>
+                        <div class="sticker-data-row">
+                            <span class="sticker-data-label">Piso & Sector</span>
+                            <span class="sticker-data-val" id="qr-modal-piso-sector">-</span>
+                        </div>
+                        <div class="sticker-data-row">
+                            <span class="sticker-data-label">Baterías Cambiadas</span>
+                            <span class="sticker-data-val" id="qr-modal-baterias">-</span>
+                        </div>
+                        <div class="sticker-data-row">
+                            <span class="sticker-data-label">Horas Operación</span>
+                            <span class="sticker-data-val" id="qr-modal-horas">0.0 hrs</span>
+                        </div>
+                        <div class="sticker-data-row">
+                            <span class="sticker-data-label">Fecha Instalación</span>
+                            <span class="sticker-data-val" id="qr-modal-install">-</span>
+                        </div>
+                        <div class="sticker-data-row full-width-row" id="qr-modal-obs-container">
+                            <span class="sticker-data-label">Observaciones Levantamiento</span>
+                            <span class="sticker-data-val" id="qr-modal-obs">-</span>
+                        </div>
+                        <div class="sticker-data-row full-width-row" id="qr-modal-last-mant-container">
+                            <span class="sticker-data-label">Última Mantención Registrada</span>
+                            <span class="sticker-data-val" id="qr-modal-last-mant">-</span>
+                        </div>
+                    </div>
+
+                    <!-- Pie de Etiqueta -->
+                    <div class="sticker-footer">
+                        <div>CFE LBC · mantencion.cfelbc.cl</div>
+                        <div>Escanee este código con la app para consultar ficha técnica o registrar mantención</div>
+                    </div>
                 </div>
             </div>
             <div class="modal-footer">
@@ -810,7 +870,7 @@
     <script src="./js/jsqr.min.js"></script>
     <script src="./js/qrscanner.js"></script>
     <script src="./js/rut.js"></script>
-    <script src="./js/storage.js?v=1.0.5"></script>
-    <script src="./js/app.js?v=1.0.5"></script>
+    <script src="./js/storage.js?v=1.0.6"></script>
+    <script src="./js/app.js?v=1.0.6"></script>
 </body>
 </html>
