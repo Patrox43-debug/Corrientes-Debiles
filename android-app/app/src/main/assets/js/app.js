@@ -92,8 +92,44 @@ class AppController {
             return;
         }
 
-        // --- LOCAL STORAGE MODE ---
-        if (!window.appStorage || window.appStorage.getMode() === 'local') {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = 'Validando acceso...';
+
+        // Intento 1: Si hay servidor HTTP disponible, autenticar contra la API
+        if (typeof window !== 'undefined' && window.location && window.location.protocol.startsWith('http')) {
+            try {
+                const cloudUrl = (window.appStorage && window.appStorage.getMode() === 'cloud') 
+                    ? window.appStorage.getCloudUrl() 
+                    : '';
+                const res = await fetch(`${cloudUrl}/api/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ rut, password })
+                });
+                const data = await res.json();
+
+                if (res.ok && data.success) {
+                    this.token = data.token;
+                    this.currentUser = data.user;
+                    localStorage.setItem('auth_token', this.token);
+                    localStorage.setItem('auth_user', JSON.stringify(this.currentUser));
+
+                    this.showToast(data.message || `Bienvenido/a, ${data.user.nombre}`, 'success');
+                    this.showDashboard();
+                    submitBtn.disabled = false;
+                    return;
+                } else if (res.status === 401) {
+                    this.showToast(data.error || 'Credenciales incorrectas.', 'error');
+                    submitBtn.disabled = false;
+                    return;
+                }
+            } catch (err) {
+                console.warn('Servidor no disponible en /api/login, recurriendo a validación local:', err);
+            }
+        }
+
+        // Intento 2: Autenticación con base de datos local (Modo Offline / APK)
+        if (window.appStorage && window.appStorage.localDb) {
             const user = window.appStorage.localDb.authenticate(rut, password);
             if (user) {
                 this.token = 'local_session_' + Date.now();
@@ -103,49 +139,13 @@ class AppController {
 
                 this.showToast(`Bienvenido/a, ${user.nombre}`, 'success');
                 this.showDashboard();
+                submitBtn.disabled = false;
+                return;
             } else {
                 this.showToast('Credenciales incorrectas. Verifique RUT y contraseña.', 'error');
             }
-            return;
         }
-
-        // --- CLOUD SERVER MODE ---
-        submitBtn.disabled = true;
-        submitBtn.innerHTML = 'Validando acceso...';
-
-        try {
-            const cloudUrl = window.appStorage.getCloudUrl();
-            const res = await fetch(`${cloudUrl}/api/login`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ rut, password })
-            });
-            const data = await res.json();
-
-            if (res.ok && data.success) {
-                this.token = data.token;
-                this.currentUser = data.user;
-                localStorage.setItem('auth_token', this.token);
-                localStorage.setItem('auth_user', JSON.stringify(this.currentUser));
-
-                this.showToast(data.message || 'Bienvenido al sistema', 'success');
-                this.showDashboard();
-            } else {
-                this.showToast(data.error || 'Credenciales incorrectas.', 'error');
-            }
-        } catch (err) {
-            this.showToast('Error de comunicación con el servidor en la nube. Cambie a Modo Local en caso de no disponer de red.', 'error');
-        } finally {
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = `
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path>
-                    <polyline points="10 17 15 12 10 7"></polyline>
-                    <line x1="15" y1="12" x2="3" y2="12"></line>
-                </svg>
-                Ingresar al Sistema
-            `;
-        }
+        submitBtn.disabled = false;
     }
 
     async handleLogout() {
@@ -373,7 +373,37 @@ class AppController {
     }
 
     async loadStats() {
-        if (!window.appStorage || window.appStorage.getMode() === 'local') {
+        let loaded = false;
+
+        // Intentar consultar estadísticas al servidor API si hay red disponible
+        if (typeof window !== 'undefined' && window.location && window.location.protocol.startsWith('http')) {
+            try {
+                const cloudUrl = (window.appStorage && window.appStorage.getMode() === 'cloud') 
+                    ? window.appStorage.getCloudUrl() 
+                    : '';
+                const res = await fetch(`${cloudUrl}/api/stats`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.success && data.stats) {
+                        const s = data.stats;
+                        const totalEl = document.getElementById('stat-total-equipos');
+                        const operEl = document.getElementById('stat-operativos');
+                        const mantEl = document.getElementById('stat-en-mantencion');
+                        const fdsEl = document.getElementById('stat-fuera-servicio');
+                        if (totalEl) totalEl.textContent = s.total_equipos;
+                        if (operEl) operEl.textContent = s.operativos;
+                        if (mantEl) mantEl.textContent = s.en_mantencion;
+                        if (fdsEl) fdsEl.textContent = s.otros_estados !== undefined ? s.otros_estados : (s.criticos || 0);
+                        loaded = true;
+                    }
+                }
+            } catch (e) {
+                console.warn('No se pudo cargar estadísticas del servidor:', e);
+            }
+        }
+
+        // Si no se pudo obtener del servidor, usar base de datos local
+        if (!loaded && window.appStorage && window.appStorage.localDb) {
             const s = window.appStorage.localDb.getStats();
             const totalEl = document.getElementById('stat-total-equipos');
             const operEl = document.getElementById('stat-operativos');
@@ -383,58 +413,47 @@ class AppController {
             if (operEl) operEl.textContent = s.operativos;
             if (mantEl) mantEl.textContent = s.en_mantencion;
             if (fdsEl) fdsEl.textContent = s.otros_estados !== undefined ? s.otros_estados : (s.criticos || 0);
-            return;
-        }
-
-        try {
-            const cloudUrl = window.appStorage.getCloudUrl();
-            const res = await fetch(`${cloudUrl}/api/stats`);
-            const data = await res.json();
-            if (data.success && data.stats) {
-                const s = data.stats;
-                const totalEl = document.getElementById('stat-total-equipos');
-                const operEl = document.getElementById('stat-operativos');
-                const mantEl = document.getElementById('stat-en-mantencion');
-                const fdsEl = document.getElementById('stat-fuera-servicio');
-                if (totalEl) totalEl.textContent = s.total_equipos;
-                if (operEl) operEl.textContent = s.operativos;
-                if (mantEl) mantEl.textContent = s.en_mantencion;
-                if (fdsEl) fdsEl.textContent = s.otros_estados !== undefined ? s.otros_estados : (s.criticos || 0);
-            }
-        } catch (e) {
-            console.error('Error fetching stats from cloud', e);
         }
     }
 
     async loadEquipos() {
-        const search = document.getElementById('search-input').value.trim();
+        const searchInput = document.getElementById('search-input');
+        const search = (searchInput ? searchInput.value : '').trim();
+        let loaded = false;
 
-        if (!window.appStorage || window.appStorage.getMode() === 'local') {
+        // Intentar consultar al servidor API primero si hay conexión
+        if (typeof window !== 'undefined' && window.location && window.location.protocol.startsWith('http')) {
+            try {
+                const cloudUrl = (window.appStorage && window.appStorage.getMode() === 'cloud') 
+                    ? window.appStorage.getCloudUrl() 
+                    : '';
+                const params = new URLSearchParams();
+                if (search) params.append('search', search);
+
+                const res = await fetch(`${cloudUrl}/api/equipos?${params.toString()}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.success && Array.isArray(data.equipos)) {
+                        this.equipos = data.equipos;
+                        // Sincronizar en almacenamiento local para acceso offline
+                        if (window.appStorage && window.appStorage.localDb) {
+                            window.appStorage.localDb.saveEquipos(data.equipos);
+                        }
+                        this.renderEquipos();
+                        this.updateQuickDemoSelect();
+                        loaded = true;
+                    }
+                }
+            } catch (e) {
+                console.warn('Conexión con servidor no disponible, usando base de datos local:', e);
+            }
+        }
+
+        // Si estamos sin red o en la app offline, recurrir a base de datos local
+        if (!loaded && window.appStorage && window.appStorage.localDb) {
             this.equipos = window.appStorage.localDb.getEquipos(search);
             this.renderEquipos();
             this.updateQuickDemoSelect();
-            return;
-        }
-
-        const params = new URLSearchParams();
-        if (search) params.append('search', search);
-
-        try {
-            const cloudUrl = window.appStorage.getCloudUrl();
-            const res = await fetch(`${cloudUrl}/api/equipos?${params.toString()}`);
-            const data = await res.json();
-            if (data.success) {
-                this.equipos = data.equipos;
-                this.renderEquipos();
-                this.updateQuickDemoSelect();
-            }
-        } catch (e) {
-            this.showToast('Error cargando equipos de la nube. Mostrando datos locales.', 'error');
-            if (window.appStorage) {
-                this.equipos = window.appStorage.localDb.getEquipos(search);
-                this.renderEquipos();
-                this.updateQuickDemoSelect();
-            }
         }
     }
 
@@ -766,32 +785,41 @@ class AppController {
 
     async handleQrDetected(code) {
         this.closeQrScanner();
-        this.showToast(`Código QR detectado: ${code}`, 'success');
+        this.showToast(`Código detectado: ${code}`, 'success');
+        let found = false;
 
-        if (!window.appStorage || window.appStorage.getMode() === 'local') {
+        // Intentar consultar al servidor API primero si hay conexión
+        if (typeof window !== 'undefined' && window.location && window.location.protocol.startsWith('http')) {
+            try {
+                const cloudUrl = (window.appStorage && window.appStorage.getMode() === 'cloud') 
+                    ? window.appStorage.getCloudUrl() 
+                    : '';
+                const res = await fetch(`${cloudUrl}/api/equipos/qr/${encodeURIComponent(code)}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.success && data.equipo) {
+                        this.renderDetailModal(data.equipo);
+                        this.openModal('equipo-detail-modal');
+                        found = true;
+                        return;
+                    }
+                }
+            } catch (e) {
+                console.warn('Error buscando QR en el servidor, usando base de datos local:', e);
+            }
+        }
+
+        // Si no se encontró en servidor o no hay red, buscar en base local
+        if (!found && window.appStorage && window.appStorage.localDb) {
             const eq = window.appStorage.localDb.getEquipoByCode(code);
             if (eq) {
                 this.renderDetailModal(eq);
                 this.openModal('equipo-detail-modal');
-            } else {
-                this.showToast(`No se encontró equipo registrado con código QR '${code}'`, 'error');
+                return;
             }
-            return;
         }
 
-        try {
-            const cloudUrl = window.appStorage.getCloudUrl();
-            const res = await fetch(`${cloudUrl}/api/equipos/qr/${encodeURIComponent(code)}`);
-            const data = await res.json();
-            if (data.success && data.equipo) {
-                this.renderDetailModal(data.equipo);
-                this.openModal('equipo-detail-modal');
-            } else {
-                this.showToast(data.error || 'No se encontró equipo con este código', 'error');
-            }
-        } catch (e) {
-            this.showToast('Error al buscar código QR en el servidor', 'error');
-        }
+        this.showToast(`No se encontró equipo registrado con código o N° de Serie '${code}'`, 'error');
     }
 
     handleManualQrSearch() {
@@ -806,30 +834,40 @@ class AppController {
        MODALS: DETALLE DE EQUIPO E HISTORIAL DE MANTENCIONES
        ========================================================================== */
     async openDetailModal(equipoId) {
-        if (!window.appStorage || window.appStorage.getMode() === 'local') {
+        let loaded = false;
+
+        // Intentar consultar detalle en el servidor si hay conexión
+        if (typeof window !== 'undefined' && window.location && window.location.protocol.startsWith('http')) {
+            try {
+                const cloudUrl = (window.appStorage && window.appStorage.getMode() === 'cloud') 
+                    ? window.appStorage.getCloudUrl() 
+                    : '';
+                const res = await fetch(`${cloudUrl}/api/equipos/${equipoId}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.success && data.equipo) {
+                        this.renderDetailModal(data.equipo);
+                        this.openModal('equipo-detail-modal');
+                        loaded = true;
+                        return;
+                    }
+                }
+            } catch (e) {
+                console.warn('Error al cargar detalle en el servidor, usando base local:', e);
+            }
+        }
+
+        // Si no se pudo obtener del servidor, buscar en base local
+        if (!loaded && window.appStorage && window.appStorage.localDb) {
             const eq = window.appStorage.localDb.getEquipoById(equipoId);
             if (eq) {
                 this.renderDetailModal(eq);
                 this.openModal('equipo-detail-modal');
-            } else {
-                this.showToast('Equipo no encontrado en la base de datos local', 'error');
+                return;
             }
-            return;
         }
 
-        try {
-            const cloudUrl = window.appStorage.getCloudUrl();
-            const res = await fetch(`${cloudUrl}/api/equipos/${equipoId}`);
-            const data = await res.json();
-            if (data.success && data.equipo) {
-                this.renderDetailModal(data.equipo);
-                this.openModal('equipo-detail-modal');
-            } else {
-                this.showToast(data.error || 'Error al cargar equipo', 'error');
-            }
-        } catch (e) {
-            this.showToast('Error de red al consultar equipo', 'error');
-        }
+        this.showToast('Equipo no encontrado en el sistema', 'error');
     }
 
     renderDetailModal(eq) {

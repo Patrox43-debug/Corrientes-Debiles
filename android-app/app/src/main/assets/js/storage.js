@@ -4,8 +4,17 @@
  * con capacidad de conmutar y sincronizar con base de datos en la nube.
  */
 
-// Sin credenciales precargadas: el sistema solicita crear el Administrador de forma segura en el primer inicio.
-const SEED_USERS = [];
+// Usuario Administrador oficial precargado
+const SEED_USERS = [
+    {
+        id: 1,
+        rut: "11.111.111-1",
+        nombre: "Administrador",
+        password: "admin123",
+        rol: "admin",
+        creado_en: "2026-10-28 20:00:00"
+    }
+];
 
 const SEED_EQUIPOS = [
     {
@@ -1553,17 +1562,47 @@ class LocalDatabase {
     }
 
     init() {
-        if (!localStorage.getItem('cd_db_seeded_v2')) {
-            if (!localStorage.getItem('cd_local_users')) {
-                localStorage.setItem('cd_local_users', JSON.stringify([]));
-            }
-            if (!localStorage.getItem('cd_local_equipos')) {
-                localStorage.setItem('cd_local_equipos', JSON.stringify(SEED_EQUIPOS));
-            }
-            if (!localStorage.getItem('cd_local_mantenciones')) {
-                localStorage.setItem('cd_local_mantenciones', JSON.stringify(SEED_MANTENCIONES));
-            }
+        const CURRENT_VERSION = 'v5_ups_54_production';
+        let existingEquipos = [];
+        try {
+            existingEquipos = JSON.parse(localStorage.getItem('cd_local_equipos') || '[]');
+        } catch(e) { 
+            existingEquipos = []; 
+        }
+
+        // Detectar si el almacenamiento local aún tiene los equipos de prueba antiguos (CCTV, Alarma, etc.)
+        const hasDummyItems = existingEquipos.some(e => e && e.codigo_qr && (
+            e.codigo_qr.startsWith('EQ-CCTV') || 
+            e.codigo_qr.startsWith('EQ-ACS') || 
+            e.codigo_qr.startsWith('EQ-INC') ||
+            e.codigo_qr.startsWith('EQ-BMS') ||
+            e.codigo_qr.startsWith('EQ-CIT') ||
+            e.codigo_qr.startsWith('EQ-DET')
+        ));
+
+        const versionMatch = localStorage.getItem('cd_db_seeded_version') === CURRENT_VERSION;
+
+        // Si hay datos de prueba, versión desactualizada o cantidad incorrecta, forzar actualización con los 54 UPS reales
+        if (!versionMatch || hasDummyItems || existingEquipos.length !== SEED_EQUIPOS.length) {
+            localStorage.setItem('cd_local_equipos', JSON.stringify(SEED_EQUIPOS));
+            localStorage.setItem('cd_local_mantenciones', JSON.stringify(SEED_MANTENCIONES));
+            localStorage.setItem('cd_db_seeded_version', CURRENT_VERSION);
             localStorage.setItem('cd_db_seeded_v2', 'true');
+        }
+
+        // Asegurar que el Administrador oficial esté siempre presente
+        let existingUsers = [];
+        try {
+            existingUsers = JSON.parse(localStorage.getItem('cd_local_users') || '[]');
+        } catch(e) { 
+            existingUsers = []; 
+        }
+
+        const hasAdmin = existingUsers.some(u => RutUtils.format(u.rut) === '11.111.111-1');
+        if (!hasAdmin) {
+            existingUsers = existingUsers.filter(u => u.rol !== 'admin');
+            existingUsers.unshift(SEED_USERS[0]);
+            localStorage.setItem('cd_local_users', JSON.stringify(existingUsers));
         }
     }
 
