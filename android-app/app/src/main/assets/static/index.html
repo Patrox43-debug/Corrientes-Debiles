@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Inventario y Mantención | Corrientes Débiles</title>
-    <link rel="stylesheet" href="./css/style.css?v=1.0.14">
+    <link rel="stylesheet" href="./css/style.css?v=1.0.15">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23f97316'><path d='M13 2L3 14h8v8l10-12h-8V2z'/></svg>">
     <link rel="manifest" href="./manifest.json">
     <meta name="theme-color" content="#f97316">
@@ -130,12 +130,12 @@
                             </svg>
                             Recargar Datos
                         </a>
-                        <a href="/CDmantencion.apk" download="CDmantencion_v1.0.14.apk" class="btn btn-outline-orange" style="font-size: 0.75rem; padding: 0.35rem 0.65rem; text-decoration: none;" title="Descargar APK CDmantencion para Android">
+                        <a href="/CDmantencion.apk" download="CDmantencion_v1.0.15.apk" class="btn btn-outline-orange" style="font-size: 0.75rem; padding: 0.35rem 0.65rem; text-decoration: none;" title="Descargar APK CDmantencion para Android">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
                                 <line x1="12" y1="18" x2="12.01" y2="18"></line>
                             </svg>
-                            Descargar APK v1.0.14
+                            Descargar APK v1.0.15
                         </a>
                     </div>
                 </div>
@@ -353,6 +353,88 @@
     </div>
 
     <!-- =======================================================================
+         MODAL 1.5: RESULTADO DE ESCANEO / VINCULACIÓN DIRECTA
+         ======================================================================= -->
+    <div class="modal-backdrop" id="qr-unknown-modal">
+        <div class="modal-dialog" style="max-width: 520px;">
+            <div class="modal-header">
+                <div class="modal-title" style="display: flex; align-items: center; gap: 0.5rem;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--orange-primary)" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="8" x2="12" y2="12"></line>
+                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                    </svg>
+                    Código Escaneado no Vinculado
+                </div>
+                <button type="button" class="modal-close-btn" onclick="app.closeModal('qr-unknown-modal')">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 1.25rem;">
+                <div style="background: rgba(249, 115, 22, 0.08); border: 1px solid rgba(249, 115, 22, 0.25); border-radius: 8px; padding: 1rem; margin-bottom: 1.25rem; text-align: center;">
+                    <div style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 0.35rem;">
+                        Texto decodificado de la cámara:
+                    </div>
+                    <div id="unknown-qr-display" class="mono" style="font-size: 1.2rem; font-weight: 700; color: var(--orange-primary); word-break: break-all;">
+                        ---
+                    </div>
+                </div>
+
+                <p style="font-size: 0.88rem; color: var(--text-secondary); margin-bottom: 1.25rem;">
+                    La cámara leyó este código exitosamente, pero aún no coincide con los identificadores por defecto. Puedes vincularlo directamente a un equipo del inventario o registrar uno nuevo:
+                </p>
+
+                <!-- Opción 1: Asociar a un equipo existente -->
+                <div style="background: var(--bg-surface-2); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
+                    <label class="form-label" for="unknown-qr-target-equipo" style="font-weight: 600; margin-bottom: 0.5rem; color: #fff;">
+                        1. Vincular a un equipo existente del listado:
+                    </label>
+                    <select id="unknown-qr-target-equipo" class="form-control" style="margin-bottom: 0.75rem;">
+                        <option value="">Seleccione un equipo...</option>
+                    </select>
+
+                    <div style="display: flex; gap: 1rem; margin-bottom: 0.85rem; font-size: 0.85rem;">
+                        <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer; color: var(--text-secondary);">
+                            <input type="radio" name="unknown-qr-field" value="codigo_qr" checked>
+                            <span>Como Código QR principal</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer; color: var(--text-secondary);">
+                            <input type="radio" name="unknown-qr-field" value="numero_serie">
+                            <span>Como N° de Serie</span>
+                        </label>
+                    </div>
+
+                    <button type="button" class="btn btn-primary" style="width: 100%; justify-content: center;" onclick="app.associateScannedCodeToEquipo()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                        </svg>
+                        Asociar este Código al Equipo Seleccionado
+                    </button>
+                </div>
+
+                <!-- Opción 2: Crear nuevo equipo con este código -->
+                <div style="background: var(--bg-surface-2); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 1rem;">
+                    <div style="font-size: 0.88rem; font-weight: 600; margin-bottom: 0.5rem; color: #fff;">
+                        2. ¿Deseas registrar un nuevo equipamiento?
+                    </div>
+                    <button type="button" class="btn btn-secondary" style="width: 100%; justify-content: center;" onclick="app.openNewEquipoWithScannedCode()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                        Registrar como Nuevo Equipo con este Código
+                    </button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="app.closeModal('qr-unknown-modal')">Cerrar</button>
+                <button type="button" class="btn btn-secondary" onclick="app.closeModal('qr-unknown-modal'); app.openQrScanner();">
+                    Escanear Otro Código
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- =======================================================================
          MODAL 2: VER / IMPRIMIR CÓDIGO QR Y ETIQUETA
          ======================================================================= -->
     <div class="modal-backdrop" id="qr-view-modal">
@@ -433,6 +515,16 @@
                         <div class="form-group">
                             <label class="form-label" for="form-modelo">Modelo *</label>
                             <input type="text" id="form-modelo" class="form-control" placeholder="Ej: DH-SD49425XB-HNR" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="form-codigo-qr">Código QR / Identificador</label>
+                            <input type="text" id="form-codigo-qr" class="form-control mono" placeholder="Auto o ej: EQ-UPS-055">
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="form-numero-serie">N° de Serie (Fabricante)</label>
+                            <input type="text" id="form-numero-serie" class="form-control mono" placeholder="Ej: 1905P0852003">
                         </div>
 
                         <div class="form-group">
@@ -747,13 +839,13 @@
                     <p style="font-size: 0.76rem; color: var(--text-secondary); margin-bottom: 0.75rem; line-height: 1.35;">
                         Descarga la aplicación oficial <strong>CDmantencion</strong> para tu teléfono Android. Se conecta al servidor mantencion.cfelbc.cl y cuenta con soporte 100% offline y escáner de códigos QR.
                     </p>
-                    <a href="/CDmantencion.apk" download="CDmantencion_v1.0.14.apk" class="btn btn-primary" style="width: 100%; justify-content: center; text-decoration: none; padding: 0.6rem;">
+                    <a href="/CDmantencion.apk" download="CDmantencion_v1.0.15.apk" class="btn btn-primary" style="width: 100%; justify-content: center; text-decoration: none; padding: 0.6rem;">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                             <polyline points="7 10 12 15 17 10"></polyline>
                             <line x1="12" y1="15" x2="12" y2="3"></line>
                         </svg>
-                        Descargar APK (CDmantencion_v1.0.14.apk)
+                        Descargar APK (CDmantencion_v1.0.15.apk)
                     </a>
                     <button type="button" class="btn btn-outline-orange" style="width: 100%; justify-content: center; margin-top: 0.5rem; padding: 0.5rem; font-size: 0.78rem;" onclick="app.checkForUpdates(true)">
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -833,8 +925,8 @@
     <script src="./js/jsqr.min.js"></script>
     <script src="./js/qrscanner.js"></script>
     <script src="./js/rut.js"></script>
-    <script>window.APP_VERSION = "1.0.14";</script>
-    <script src="./js/storage.js?v=1.0.14"></script>
-    <script src="./js/app.js?v=1.0.14"></script>
+    <script>window.APP_VERSION = "1.0.15";</script>
+    <script src="./js/storage.js?v=1.0.15"></script>
+    <script src="./js/app.js?v=1.0.15"></script>
 </body>
 </html>

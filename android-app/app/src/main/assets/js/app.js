@@ -317,7 +317,7 @@ class AppController {
         const firstName = (this.currentUser?.nombre || 'Usuario').split(' ')[0];
         const roleName = isAdmin ? 'Administrador' : 'Técnico';
         const isLocal = !window.appStorage || window.appStorage.getMode() === 'local';
-        const currentVer = (window.APP_VERSION || '1.0.14').replace(/^[vV]/, '');
+        const currentVer = (window.APP_VERSION || '1.0.15').replace(/^[vV]/, '');
         const apkFilename = `CDmantencion_v${currentVer}.apk`;
 
         navActions.innerHTML = `
@@ -1124,40 +1124,43 @@ class AppController {
         this.closeModal('qr-scanner-modal');
     }
 
-    async handleQrDetected(code) {
+    async handleQrDetected(code, rawCode) {
         this.closeQrScanner();
 
-        // Limpiar y extraer código canonical (ej. EQ-UPS-001) si viene en URL o texto compuesto
-        let cleanCode = (code || '').trim();
-        if (cleanCode.includes('qr=')) {
-            try {
-                const url = new URL(cleanCode, window.location.origin);
-                cleanCode = url.searchParams.get('qr') || cleanCode;
-            } catch (e) {}
-        } else if (cleanCode.includes('/equipo/')) {
-            cleanCode = cleanCode.split('/equipo/').pop().split(/[?#]/)[0];
-        }
-        const match = cleanCode.match(/EQ-[A-Z0-9]+-\d+/i);
-        if (match) {
-            cleanCode = match[0].toUpperCase();
+        const inputCode = String(code || rawCode || '').trim();
+        if (!inputCode) return;
+
+        // 1. Búsqueda directa en base de datos local / memoria con el motor inteligente multiformato
+        let matchedEq = null;
+
+        if (window.appStorage && window.appStorage.localDb) {
+            matchedEq = window.appStorage.localDb.getEquipoByCode(inputCode);
         }
 
-        this.showToast(`Código QR detectado: ${cleanCode}`, 'info');
-        let found = false;
+        if (!matchedEq && Array.isArray(this.equipos) && this.equipos.length > 0) {
+            if (typeof window.smartFindEquipo === 'function') {
+                matchedEq = window.smartFindEquipo(inputCode, this.equipos);
+            }
+        }
 
-        const isDesktopLocalhost = typeof window !== 'undefined' && 
-                                   window.location && 
-                                   (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+        if (matchedEq) {
+            this.renderDetailModal(matchedEq);
+            this.openModal('equipo-detail-modal');
+            this.showToast(`✓ Ficha cargada: ${matchedEq.nombre} (${matchedEq.codigo_qr})`, 'success');
+            return;
+        }
+
+        // 2. Si hay conexión HTTP al servidor (desktop, web o cloud mode), consultar API
+        const isHttp = typeof window !== 'undefined' && window.location && window.location.protocol.startsWith('http');
         const isCloudMode = window.appStorage && window.appStorage.getMode() === 'cloud';
 
-        // 1. Consultar API en el servidor (en Modo Nube o en servidor local)
-        if (isCloudMode || isDesktopLocalhost) {
+        if (isHttp || isCloudMode) {
             try {
                 const cloudUrl = isCloudMode ? window.appStorage.getCloudUrl() : '';
                 const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 2500);
+                const timeoutId = setTimeout(() => controller.abort(), 2000);
 
-                const res = await fetch(`${cloudUrl}/api/equipos/qr/${encodeURIComponent(cleanCode)}`, { signal: controller.signal });
+                const res = await fetch(`${cloudUrl}/api/equipos/qr/${encodeURIComponent(inputCode)}`, { signal: controller.signal });
                 clearTimeout(timeoutId);
 
                 if (res.ok) {
@@ -1166,42 +1169,121 @@ class AppController {
                         this.renderDetailModal(data.equipo);
                         this.openModal('equipo-detail-modal');
                         this.showToast(`✓ Ficha cargada: ${data.equipo.nombre} (${data.equipo.codigo_qr})`, 'success');
-                        found = true;
                         return;
                     }
                 }
             } catch (e) {
-                console.warn('Error buscando QR en el servidor, usando base de datos local:', e);
+                console.debug('Consulta API QR falló o timeout:', e);
             }
         }
 
-        // 2. Modo Local o fallback offline: buscar en base de datos local
-        if (!found && window.appStorage && window.appStorage.localDb) {
-            const eq = window.appStorage.localDb.getEquipoByCode(cleanCode);
-            if (eq) {
-                this.renderDetailModal(eq);
-                this.openModal('equipo-detail-modal');
-                this.showToast(`✓ Ficha cargada (Local): ${eq.nombre} (${eq.codigo_qr})`, 'success');
-                return;
+        // 3. Si no se encontró: Abrir modal de código escaneado no vinculado (permite asociarlo con 1 toque o crear nuevo)
+        this.openScanResultModal(inputCode);
+    }
+
+    openScanResultModal(scannedCode) {
+        this.currentScannedCode = scannedCode;
+        const display = document.getElementById('unknown-qr-display');
+        if (display) {
+            display.textContent = scannedCode;
+        }
+
+        // Poblar el dropdown de equipos existentes
+        const select = document.getElementById('unknown-qr-target-equipo');
+        if (select) {
+            select.innerHTML = '<option value="">-- Seleccionar un equipo existente --</option>';
+            const equipos = (window.appStorage && window.appStorage.localDb)
+                ? window.appStorage.localDb.getEquiposRaw()
+                : (this.equipos || []);
+
+            equipos.sort((a, b) => (a.id || 0) - (b.id || 0)).forEach(eq => {
+                const opt = document.createElement('option');
+                opt.value = eq.id;
+                opt.textContent = `${eq.codigo_qr} - ${eq.nombre} (${eq.recinto || eq.ubicacion || 'General'})`;
+                select.appendChild(opt);
+            });
+        }
+
+        this.openModal('qr-unknown-modal');
+        this.showToast(`Código detectado: '${scannedCode}'. Elija equipo para vincular.`, 'info');
+    }
+
+    async associateScannedCodeToEquipo() {
+        const code = this.currentScannedCode;
+        if (!code) {
+            this.showToast('No hay código escaneado activo', 'error');
+            return;
+        }
+
+        const select = document.getElementById('unknown-qr-target-equipo');
+        const eqId = select ? select.value : null;
+        if (!eqId) {
+            this.showToast('Por favor seleccione un equipo del listado', 'error');
+            return;
+        }
+
+        const fieldRadios = document.getElementsByName('unknown-qr-field');
+        let chosenField = 'codigo_qr';
+        for (const r of fieldRadios) {
+            if (r.checked) {
+                chosenField = r.value;
+                break;
             }
         }
 
-        // 3. Fallback adicional en la lista cargada en memoria
-        if (!found && Array.isArray(this.equipos) && this.equipos.length > 0) {
-            const eq = this.equipos.find(e => 
-                (e.codigo_qr && e.codigo_qr.toUpperCase() === cleanCode.toUpperCase()) ||
-                (e.numero_serie && e.numero_serie.toUpperCase() === cleanCode.toUpperCase()) ||
-                (e.nombre && e.nombre.toUpperCase() === cleanCode.toUpperCase())
-            );
-            if (eq) {
-                this.renderDetailModal(eq);
-                this.openModal('equipo-detail-modal');
-                this.showToast(`✓ Ficha cargada: ${eq.nombre} (${eq.codigo_qr})`, 'success');
-                return;
+        let updatedEq = null;
+
+        // Actualizar en base de datos local
+        if (window.appStorage && window.appStorage.localDb) {
+            try {
+                updatedEq = window.appStorage.localDb.associateCodeToEquipo(eqId, code, chosenField);
+            } catch (err) {
+                console.warn('Error asociando en localDb:', err);
             }
         }
 
-        this.showToast(`No se encontró equipo registrado con código o N° de Serie '${cleanCode}'`, 'error');
+        // Si hay backend HTTP disponible, sincronizar también vía API
+        const isHttp = typeof window !== 'undefined' && window.location && window.location.protocol.startsWith('http');
+        if (isHttp) {
+            try {
+                const payload = {};
+                payload[chosenField] = code;
+                const res = await fetch(`/api/equipos/${eqId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.equipo) updatedEq = data.equipo;
+                }
+            } catch (e) {}
+        }
+
+        this.closeModal('qr-unknown-modal');
+        await this.loadDashboardData();
+
+        if (updatedEq) {
+            this.renderDetailModal(updatedEq);
+            this.openModal('equipo-detail-modal');
+            this.showToast(`✓ Código '${code}' vinculado exitosamente a ${updatedEq.nombre}`, 'success');
+        } else {
+            this.showToast(`✓ Código vinculado con éxito`, 'success');
+        }
+    }
+
+    openNewEquipoWithScannedCode() {
+        const code = this.currentScannedCode;
+        this.closeModal('qr-unknown-modal');
+        this.openNewEquipoModal();
+        const qrInput = document.getElementById('form-codigo-qr');
+        if (qrInput && code) {
+            qrInput.value = code;
+        }
+        const snInput = document.getElementById('form-numero-serie');
+        if (snInput && code) {
+            snInput.value = code;
+        }
     }
 
     handleManualQrSearch() {
@@ -1394,6 +1476,8 @@ class AppController {
         document.getElementById('equipo-form').reset();
         document.getElementById('form-equipo-id').value = '';
         document.getElementById('form-horas-trabajo').value = '0.0';
+        if (document.getElementById('form-codigo-qr')) document.getElementById('form-codigo-qr').value = '';
+        if (document.getElementById('form-numero-serie')) document.getElementById('form-numero-serie').value = '';
         document.getElementById('first-maintenance-section').style.display = 'block';
 
         // Pre-fill default date today
@@ -1414,6 +1498,8 @@ class AppController {
         document.getElementById('form-nombre').value = eq.nombre;
         document.getElementById('form-marca').value = eq.marca;
         document.getElementById('form-modelo').value = eq.modelo;
+        if (document.getElementById('form-codigo-qr')) document.getElementById('form-codigo-qr').value = eq.codigo_qr || '';
+        if (document.getElementById('form-numero-serie')) document.getElementById('form-numero-serie').value = eq.numero_serie || '';
         document.getElementById('form-fecha-instalacion').value = eq.fecha_instalacion;
         document.getElementById('form-horas-trabajo').value = eq.horas_trabajo || 0;
         document.getElementById('form-estado').value = eq.estado;
@@ -1442,6 +1528,11 @@ class AppController {
             ubicacion: document.getElementById('form-ubicacion').value.trim(),
             caracteristicas: document.getElementById('form-caracteristicas').value.trim()
         };
+
+        const qrVal = document.getElementById('form-codigo-qr') ? document.getElementById('form-codigo-qr').value.trim() : '';
+        const snVal = document.getElementById('form-numero-serie') ? document.getElementById('form-numero-serie').value.trim() : '';
+        if (qrVal) data.codigo_qr = qrVal.toUpperCase();
+        if (snVal) data.numero_serie = snVal;
 
         if (!isEdit) {
             const firstTech = document.getElementById('form-primera-tecnico').value.trim();
@@ -2121,7 +2212,7 @@ class AppController {
         });
 
         // Close other modals on backdrop click
-        ['qr-view-modal', 'equipo-detail-modal', 'equipo-form-modal', 'mantencion-modal', 'admin-users-modal', 'user-form-modal', 'cloud-modal'].forEach(id => {
+        ['qr-view-modal', 'qr-unknown-modal', 'equipo-detail-modal', 'equipo-form-modal', 'mantencion-modal', 'admin-users-modal', 'user-form-modal', 'cloud-modal'].forEach(id => {
             const m = document.getElementById(id);
             if (m) {
                 m.addEventListener('click', (e) => {
@@ -2180,7 +2271,7 @@ class AppController {
             if (!res.ok) throw new Error('HTTP ' + res.status);
             const data = await res.json();
             const remoteTag = (data.tag_name || '').trim().replace(/^[vV]/, '');
-            const currentVer = (window.APP_VERSION || '1.0.14').replace(/^[vV]/, '');
+            const currentVer = (window.APP_VERSION || '1.0.15').replace(/^[vV]/, '');
 
             if (this.isNewerVersion(remoteTag, currentVer)) {
                 let apkUrl = 'https://github.com/Patrox43-debug/Corrientes-Debiles/releases/latest/download/CDmantencion.apk';

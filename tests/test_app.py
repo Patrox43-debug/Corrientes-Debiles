@@ -129,6 +129,21 @@ def test_suite():
         assert len(eq['mantenciones']) >= 1
         print(f"✓ Test 8: GET /api/equipos/qr/EQ-UPS-001 OK -> {eq['nombre']} ({len(eq['mantenciones'])} mantenciones)")
 
+    # 8b. Test Multiformat QR: UPS-001 and Serial Number 1905P0852003
+    with urllib.request.urlopen(f"{base_url}/api/equipos/qr/UPS-001") as res:
+        assert res.status == 200
+        data = json.loads(res.read().decode('utf-8'))
+        assert data['success'] is True
+        assert data['equipo']['id'] == 1
+        print("✓ Test 8b: GET /api/equipos/qr/UPS-001 OK -> Matched EQ-UPS-001")
+
+    with urllib.request.urlopen(f"{base_url}/api/equipos/qr/1905P0852003") as res:
+        assert res.status == 200
+        data = json.loads(res.read().decode('utf-8'))
+        assert data['success'] is True
+        assert data['equipo']['id'] == 1
+        print("✓ Test 8c: GET /api/equipos/qr/1905P0852003 OK -> Matched by Serial Number")
+
     # 9. Test POST /api/mantenciones (Add maintenance record without technician hours)
     mant_payload = json.dumps({
         "equipo_id": 1,

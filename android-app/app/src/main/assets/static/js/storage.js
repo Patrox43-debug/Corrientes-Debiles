@@ -1564,13 +1564,172 @@ const SEED_MANTENCIONES = [
     }
 ];
 
+/**
+ * Buscador Inteligente Multiformato de Equipamiento (Grado Industrial)
+ * Reconoce códigos canónicos (EQ-UPS-001), sufijos (UPS-001, UPS 001, 001, 1),
+ * números de serie con/sin prefijo (1905P0852003, S/N: 1905P0852003),
+ * recintos (B1005, REAS, AZ022), nombres y URLs.
+ */
+function smartFindEquipo(query, equiposList) {
+    if (!query) return null;
+    const equipos = Array.isArray(equiposList) ? equiposList : [];
+    if (equipos.length === 0) return null;
+
+    let raw = String(query).trim();
+    raw = raw.replace(/^["'`]+|["'`]+$/g, '').trim();
+    if (!raw) return null;
+
+    // 1. Manejo de JSON si viene empaquetado en el QR
+    if ((raw.startsWith('{') && raw.endsWith('}')) || (raw.startsWith('[') && raw.endsWith(']'))) {
+        try {
+            const parsed = JSON.parse(raw);
+            if (parsed && typeof parsed === 'object') {
+                for (const k of ['codigo_qr', 'codigo', 'qr', 'id', 'sn', 'serial', 'numero_serie', 'recinto']) {
+                    if (parsed[k]) {
+                        raw = String(parsed[k]).trim();
+                        break;
+                    }
+                }
+            }
+        } catch (e) {}
+    }
+
+    // 2. Extracción de URLs (parámetros qr=..., /equipo/..., #...)
+    if (raw.includes('qr=')) {
+        try {
+            const match = raw.match(/[?&]qr=([^&#]+)/);
+            if (match) raw = decodeURIComponent(match[1]).trim();
+        } catch (e) {}
+    } else if (raw.includes('/equipo/')) {
+        const parts = raw.split('/equipo/').pop().split(/[?#]/);
+        if (parts[0]) raw = decodeURIComponent(parts[0]).trim();
+    } else if (raw.includes('#')) {
+        raw = raw.split('#').pop().trim();
+    }
+
+    const cleanSn = raw.replace(/^(?:S\/?N|SER(?:IAL)?)\s*[:#-]?\s*/i, '').trim();
+    const upperRaw = raw.toUpperCase();
+    const upperSn = cleanSn.toUpperCase();
+    const normRaw = upperRaw.replace(/[^A-Z0-9]/g, '');
+    const normSn = upperSn.replace(/[^A-Z0-9]/g, '');
+
+    // Nivel 1: Coincidencia Exacta en Código QR
+    for (const eq of equipos) {
+        if (!eq) continue;
+        const cqr = (eq.codigo_qr || '').trim().toUpperCase();
+        if (cqr && (cqr === upperRaw || cqr === upperSn)) {
+            return eq;
+        }
+    }
+
+    // Nivel 2: Coincidencia Exacta en N° de Serie
+    for (const eq of equipos) {
+        if (!eq) continue;
+        const sn = (eq.numero_serie || '').trim().toUpperCase();
+        if (sn && (sn === upperRaw || sn === upperSn)) {
+            return eq;
+        }
+    }
+
+    // Nivel 3: Coincidencia por ID numérico exacto (ej: "1", "54")
+    if (/^\d+$/.test(raw)) {
+        const targetId = parseInt(raw, 10);
+        for (const eq of equipos) {
+            if (eq && eq.id === targetId) {
+                return eq;
+            }
+        }
+    }
+
+    // Nivel 4: Código normalizado (sin guiones/espacios o sin 'EQ-')
+    // Ej: "UPS-001" o "UPS 001" <-> "EQ-UPS-001", "EQUPS001" <-> "EQ-UPS-001"
+    if (normRaw) {
+        for (const eq of equipos) {
+            if (!eq) continue;
+            const cqrNorm = (eq.codigo_qr || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+            if (cqrNorm && (cqrNorm === normRaw || cqrNorm === `EQ${normRaw}` || `EQ${cqrNorm}` === normRaw)) {
+                return eq;
+            }
+        }
+    }
+
+    // Nivel 5: Sufijo numérico (ej: "UPS-1", "EQ-UPS-1", "EQ-1", "001", "1")
+    const numMatch = upperRaw.match(/^(?:EQ-?)?(?:UPS-?)?0*(\d+)$/);
+    if (numMatch) {
+        const targetNum = parseInt(numMatch[1], 10);
+        const pad3 = String(targetNum).padStart(3, '0');
+        for (const eq of equipos) {
+            if (!eq) continue;
+            const cqr = (eq.codigo_qr || '').toUpperCase();
+            if (eq.id === targetNum || cqr.endsWith(`-${pad3}`) || cqr.endsWith(`-${targetNum}`)) {
+                return eq;
+            }
+        }
+    }
+
+    // Nivel 6: N° de Serie normalizado (solo alfanumérico)
+    if (normSn.length >= 4) {
+        for (const eq of equipos) {
+            if (!eq) continue;
+            const snNorm = (eq.numero_serie || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+            if (snNorm && (snNorm === normSn || normSn.includes(snNorm) || snNorm.includes(normSn))) {
+                return eq;
+            }
+        }
+    }
+
+    // Nivel 7: Recinto Exacto (ej: "B1005", "REAS", "B1041", "AZ022", "A1024")
+    for (const eq of equipos) {
+        if (!eq) continue;
+        const recinto = (eq.recinto || '').trim().toUpperCase();
+        if (recinto && (recinto === upperRaw || recinto === upperSn)) {
+            return eq;
+        }
+    }
+
+    // Nivel 8: Recinto contenido en la consulta (ej: "Recinto B1005", "Sala REAS")
+    for (const eq of equipos) {
+        if (!eq) continue;
+        const recinto = (eq.recinto || '').trim().toUpperCase();
+        if (recinto && recinto.length >= 3 && upperRaw.includes(recinto)) {
+            return eq;
+        }
+    }
+
+    // Nivel 9: Nombre del equipo exacto o contenido
+    for (const eq of equipos) {
+        if (!eq) continue;
+        const nombre = (eq.nombre || '').trim().toUpperCase();
+        if (nombre && (upperRaw === nombre || (upperRaw.length >= 6 && nombre.includes(upperRaw)))) {
+            return eq;
+        }
+    }
+
+    // Nivel 10: Búsqueda en campo Características
+    if (upperRaw.length >= 4) {
+        for (const eq of equipos) {
+            if (!eq) continue;
+            const chars = (eq.caracteristicas || '').toUpperCase();
+            if (chars.includes(upperRaw) || (normSn.length >= 4 && chars.includes(normSn))) {
+                return eq;
+            }
+        }
+    }
+
+    return null;
+}
+
+if (typeof window !== 'undefined') {
+    window.smartFindEquipo = smartFindEquipo;
+}
+
 class LocalDatabase {
     constructor() {
         this.init();
     }
 
     init() {
-        const CURRENT_VERSION = 'v6_ups_54_production';
+        const CURRENT_VERSION = 'v7_smart_qr_resolver_1.0.15';
         let existingEquipos = [];
         try {
             existingEquipos = JSON.parse(localStorage.getItem('cd_local_equipos') || '[]');
@@ -1588,14 +1747,26 @@ class LocalDatabase {
             e.codigo_qr.startsWith('EQ-DET')
         ));
 
-        const versionMatch = localStorage.getItem('cd_db_seeded_version') === CURRENT_VERSION;
-
-        // Si hay datos de prueba, versión desactualizada o cantidad incorrecta, forzar actualización con los 54 UPS reales
-        if (!versionMatch || hasDummyItems || existingEquipos.length !== SEED_EQUIPOS.length) {
+        // Si no hay equipos o tiene items de prueba antiguos, sembrar con los 54 UPS iniciales
+        if (existingEquipos.length === 0 || hasDummyItems) {
             localStorage.setItem('cd_local_equipos', JSON.stringify(SEED_EQUIPOS));
             localStorage.setItem('cd_local_mantenciones', JSON.stringify(SEED_MANTENCIONES));
             localStorage.setItem('cd_db_seeded_version', CURRENT_VERSION);
             localStorage.setItem('cd_db_seeded_v2', 'true');
+        } else {
+            // Asegurar que ningún equipo de los 54 UPS falte, pero preservar equipos y cambios del usuario
+            const existingCodes = new Set(existingEquipos.map(e => (e && e.codigo_qr ? e.codigo_qr.toUpperCase() : '')));
+            let changed = false;
+            SEED_EQUIPOS.forEach(seedEq => {
+                if (!existingCodes.has(seedEq.codigo_qr.toUpperCase())) {
+                    existingEquipos.push(seedEq);
+                    changed = true;
+                }
+            });
+            if (changed) {
+                localStorage.setItem('cd_local_equipos', JSON.stringify(existingEquipos));
+            }
+            localStorage.setItem('cd_db_seeded_version', CURRENT_VERSION);
         }
 
         // Asegurar que los usuarios oficiales estén siempre presentes
@@ -1785,37 +1956,18 @@ class LocalDatabase {
 
     getEquipoByCode(code) {
         if (!code) return null;
-        let cleanCode = code.toString().trim();
-        if (cleanCode.includes('qr=')) {
-            try {
-                const url = new URL(cleanCode, window.location.origin);
-                cleanCode = url.searchParams.get('qr') || cleanCode;
-            } catch (e) {}
-        } else if (cleanCode.includes('/equipo/')) {
-            cleanCode = cleanCode.split('/equipo/').pop().split(/[?#]/)[0];
-        }
-        const eqMatch = cleanCode.match(/EQ-[A-Z0-9]+-\d+/i);
-        const matchCode = eqMatch ? eqMatch[0].toUpperCase() : cleanCode.toUpperCase();
-        const upperRaw = cleanCode.toUpperCase();
-
         const equipos = this.getEquiposRaw();
-        const eq = equipos.find(e => {
-            const qr = (e.codigo_qr || '').toUpperCase();
-            const sn = (e.numero_serie || '').toUpperCase();
-            const chars = (e.caracteristicas || '').toUpperCase();
-            return qr === matchCode || qr === upperRaw ||
-                   sn === upperRaw || (sn && sn === matchCode) ||
-                   (upperRaw.length >= 4 && chars.includes(upperRaw));
-        });
-        if (!eq) return null;
-        return this.getEquipoById(eq.id);
+        const found = smartFindEquipo(code, equipos);
+        if (!found) return null;
+        return this.getEquipoById(found.id);
     }
 
     createEquipo(data) {
         const equipos = this.getEquiposRaw();
         const newId = equipos.length > 0 ? Math.max(...equipos.map(e => e.id)) + 1 : 1;
         const prefix = (data.nombre || 'EQ').substring(0, 3).toUpperCase().replace(/[^A-Z]/g, 'EQ');
-        const code = `EQ-${prefix}-${String(newId).padStart(3, '0')}`;
+        const defaultCode = `EQ-${prefix}-${String(newId).padStart(3, '0')}`;
+        const code = (data.codigo_qr && data.codigo_qr.trim()) ? data.codigo_qr.trim().toUpperCase() : defaultCode;
 
         const newEquipo = {
             id: newId,
@@ -1828,6 +1980,13 @@ class LocalDatabase {
             caracteristicas: (data.caracteristicas || '').trim(),
             estado: data.estado || 'Operativo',
             ubicacion: (data.ubicacion || 'General').trim(),
+            numero_serie: (data.numero_serie || '').trim(),
+            piso: (data.piso || '').trim(),
+            sector: (data.sector || '').trim(),
+            recinto: (data.recinto || '').trim(),
+            capacidad: (data.capacidad || '').trim(),
+            baterias_cambiadas: (data.baterias_cambiadas || 'No').trim(),
+            observaciones: (data.observaciones || '').trim(),
             creado_en: new Date().toISOString()
         };
 
@@ -1844,17 +2003,48 @@ class LocalDatabase {
 
         equipos[index] = {
             ...equipos[index],
-            nombre: data.nombre.trim(),
-            marca: data.marca.trim(),
-            modelo: data.modelo.trim(),
-            fecha_instalacion: data.fecha_instalacion.trim(),
-            horas_trabajo: parseFloat(data.horas_trabajo || 0.0) || 0.0,
-            caracteristicas: (data.caracteristicas || '').trim(),
-            estado: data.estado || 'Operativo',
-            ubicacion: (data.ubicacion || 'General').trim(),
+            nombre: data.nombre !== undefined ? data.nombre.trim() : equipos[index].nombre,
+            marca: data.marca !== undefined ? data.marca.trim() : equipos[index].marca,
+            modelo: data.modelo !== undefined ? data.modelo.trim() : equipos[index].modelo,
+            fecha_instalacion: data.fecha_instalacion !== undefined ? data.fecha_instalacion.trim() : equipos[index].fecha_instalacion,
+            horas_trabajo: data.horas_trabajo !== undefined ? (parseFloat(data.horas_trabajo) || 0.0) : equipos[index].horas_trabajo,
+            caracteristicas: data.caracteristicas !== undefined ? data.caracteristicas.trim() : equipos[index].caracteristicas,
+            estado: data.estado || equipos[index].estado,
+            ubicacion: data.ubicacion !== undefined ? data.ubicacion.trim() : equipos[index].ubicacion,
+            codigo_qr: (data.codigo_qr && data.codigo_qr.trim()) ? data.codigo_qr.trim().toUpperCase() : equipos[index].codigo_qr,
+            numero_serie: data.numero_serie !== undefined ? data.numero_serie.trim() : (equipos[index].numero_serie || ''),
+            piso: data.piso !== undefined ? data.piso.trim() : (equipos[index].piso || ''),
+            sector: data.sector !== undefined ? data.sector.trim() : (equipos[index].sector || ''),
+            recinto: data.recinto !== undefined ? data.recinto.trim() : (equipos[index].recinto || ''),
+            capacidad: data.capacidad !== undefined ? data.capacidad.trim() : (equipos[index].capacidad || ''),
+            baterias_cambiadas: data.baterias_cambiadas !== undefined ? data.baterias_cambiadas : (equipos[index].baterias_cambiadas || 'No'),
+            observaciones: data.observaciones !== undefined ? data.observaciones.trim() : (equipos[index].observaciones || ''),
             actualizado_en: new Date().toISOString()
         };
 
+        this.saveEquipos(equipos);
+        return this.getEquipoById(eqId);
+    }
+
+    associateCodeToEquipo(id, code, field = 'codigo_qr') {
+        const eqId = parseInt(id, 10);
+        const equipos = this.getEquiposRaw();
+        const index = equipos.findIndex(e => e.id === eqId);
+        if (index === -1) throw new Error('Equipo no encontrado');
+
+        const clean = String(code).trim();
+        if (field === 'numero_serie') {
+            equipos[index].numero_serie = clean;
+        } else {
+            equipos[index].codigo_qr = clean.toUpperCase();
+        }
+
+        const note = `[Código físico vinculado: ${clean}]`;
+        const currentChars = equipos[index].caracteristicas || '';
+        if (!currentChars.includes(note)) {
+            equipos[index].caracteristicas = (currentChars + ' ' + note).trim();
+        }
+        equipos[index].actualizado_en = new Date().toISOString();
         this.saveEquipos(equipos);
         return this.getEquipoById(eqId);
     }

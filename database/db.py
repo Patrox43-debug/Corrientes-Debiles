@@ -2,6 +2,8 @@ import sqlite3
 import os
 import hashlib
 import re
+import json
+import urllib.parse
 from datetime import datetime
 
 try:
@@ -459,26 +461,130 @@ def get_equipo_by_id(equipo_id: int):
 def get_equipo_by_code(codigo_qr: str):
     if not codigo_qr:
         return None
-    raw_code = str(codigo_qr).strip()
-    match = re.search(r'EQ-[A-Za-z0-9]+-\d+', raw_code)
-    extracted_code = match.group(0).upper() if match else raw_code
+    raw = str(codigo_qr).strip()
+    raw = re.sub(r'^["\'`]+|["\'`]+$', '', raw).strip()
+    if not raw:
+        return None
+
+    # Handle JSON payloads (e.g. {"codigo_qr": "EQ-UPS-001"} or {"id": 1})
+    if (raw.startswith('{') and raw.endswith('}')) or (raw.startswith('[') and raw.endswith(']')):
+        try:
+            parsed = json.loads(raw)
+            if isinstance(parsed, dict):
+                for k in ['codigo_qr', 'codigo', 'qr', 'id', 'sn', 'serial', 'numero_serie', 'recinto']:
+                    if parsed.get(k):
+                        raw = str(parsed[k]).strip()
+                        break
+        except Exception:
+            pass
+
+    # Extract query params / URLs
+    if 'qr=' in raw:
+        m = re.search(r'[?&]qr=([^&#]+)', raw)
+        if m:
+            raw = urllib.parse.unquote(m.group(1)).strip()
+    elif '/equipo/' in raw:
+        m = re.search(r'/equipo/([^/?#]+)', raw)
+        if m:
+            raw = urllib.parse.unquote(m.group(1)).strip()
+    elif '#' in raw:
+        raw = raw.split('#')[-1].strip()
+
+    clean_sn = re.sub(r'^(?:S/?N|SER(?:IAL)?)\s*[:#-]?\s*', '', raw, flags=re.IGNORECASE).strip()
+    norm_raw = re.sub(r'[^A-Z0-9]', '', raw.upper())
+    norm_sn = re.sub(r'[^A-Z0-9]', '', clean_sn.upper())
 
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("""
-        SELECT id FROM equipos 
-        WHERE codigo_qr = ? OR LOWER(codigo_qr) = LOWER(?)
-           OR codigo_qr = ? OR LOWER(codigo_qr) = LOWER(?)
-           OR numero_serie = ? OR LOWER(numero_serie) = LOWER(?)
-           OR LOWER(numero_serie) = LOWER(?)
-           OR caracteristicas LIKE ?
-        ORDER BY id ASC
-        LIMIT 1
-    """, (raw_code, raw_code, extracted_code, extracted_code, raw_code, raw_code, extracted_code, f"%{raw_code}%"))
-    row = cursor.fetchone()
+    cursor.execute("SELECT * FROM equipos")
+    equipos = [dict(r) for r in cursor.fetchall()]
     conn.close()
-    if row:
-        return get_equipo_by_id(row['id'])
+
+    target_id = None
+
+    # 1. Exact match on codigo_qr
+    for eq in equipos:
+        cqr = (eq.get('codigo_qr') or '').strip().upper()
+        if cqr and (cqr == raw.upper() or cqr == clean_sn.upper()):
+            target_id = eq['id']
+            break
+
+    # 2. Exact match on numero_serie
+    if not target_id:
+        for eq in equipos:
+            sn = (eq.get('numero_serie') or '').strip().upper()
+            if sn and (sn == raw.upper() or sn == clean_sn.upper()):
+                target_id = eq['id']
+                break
+
+    # 3. Numeric ID match (e.g. "1", "54")
+    if not target_id and raw.isdigit():
+        req_id = int(raw)
+        for eq in equipos:
+            if eq.get('id') == req_id:
+                target_id = eq['id']
+                break
+
+    # 4. Normalized code (without EQ- or dashes, e.g. UPS-001, UPS001, EQUPS001)
+    if not target_id and norm_raw:
+        for eq in equipos:
+            cqr_norm = re.sub(r'[^A-Z0-9]', '', (eq.get('codigo_qr') or '').upper())
+            if cqr_norm and (cqr_norm == norm_raw or cqr_norm == f'EQ{norm_raw}' or f'EQ{cqr_norm}' == norm_raw):
+                target_id = eq['id']
+                break
+
+    # 5. Suffix number match (e.g. EQ-UPS-1, UPS-1, 001)
+    if not target_id:
+        num_match = re.search(r'^(?:EQ-?)?(?:UPS-?)?0*(\d+)$', raw.upper())
+        if num_match:
+            suffix_num = int(num_match.group(1))
+            for eq in equipos:
+                if eq.get('id') == suffix_num or (eq.get('codigo_qr') or '').endswith(f'-{suffix_num:03d}'):
+                    target_id = eq['id']
+                    break
+
+    # 6. Normalized serial number (alphanumeric only)
+    if not target_id and len(norm_sn) >= 4:
+        for eq in equipos:
+            sn_norm = re.sub(r'[^A-Z0-9]', '', (eq.get('numero_serie') or '').upper())
+            if sn_norm and (sn_norm == norm_sn or norm_sn in sn_norm or sn_norm in norm_sn):
+                target_id = eq['id']
+                break
+
+    # 7. Recinto exact
+    if not target_id:
+        for eq in equipos:
+            recinto = (eq.get('recinto') or '').strip().upper()
+            if recinto and (recinto == raw.upper() or recinto == clean_sn.upper()):
+                target_id = eq['id']
+                break
+
+    # 8. Recinto contained in query (e.g. 'Recinto B1005')
+    if not target_id:
+        for eq in equipos:
+            recinto = (eq.get('recinto') or '').strip().upper()
+            if recinto and len(recinto) >= 3 and recinto in raw.upper():
+                target_id = eq['id']
+                break
+
+    # 9. Nombre exact or contained
+    if not target_id:
+        for eq in equipos:
+            nombre = (eq.get('nombre') or '').strip().upper()
+            if nombre and (raw.upper() == nombre or (len(raw) >= 6 and raw.upper() in nombre)):
+                target_id = eq['id']
+                break
+
+    # 10. Fallback characteristics search
+    if not target_id and len(raw) >= 4:
+        for eq in equipos:
+            chars = (eq.get('caracteristicas') or '').upper()
+            if raw.upper() in chars or clean_sn.upper() in chars:
+                target_id = eq['id']
+                break
+
+    if target_id:
+        return get_equipo_by_id(target_id)
     return None
 
 def create_equipo(data: dict):
@@ -565,6 +671,7 @@ def update_equipo(equipo_id: int, data: dict):
             capacidad = COALESCE(?, capacidad),
             baterias_cambiadas = COALESCE(?, baterias_cambiadas),
             observaciones = COALESCE(?, observaciones),
+            codigo_qr = COALESCE(?, codigo_qr),
             actualizado_en = CURRENT_TIMESTAMP
         WHERE id = ?
     """, (
@@ -583,6 +690,7 @@ def update_equipo(equipo_id: int, data: dict):
         data.get('capacidad'),
         data.get('baterias_cambiadas'),
         data.get('observaciones'),
+        data.get('codigo_qr'),
         equipo_id
     ))
     conn.commit()
