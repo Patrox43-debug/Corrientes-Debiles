@@ -766,131 +766,22 @@ class AppController {
 
         if (!equipo || !equipo.id) return;
 
-        // Fallbacks para campos que puedan venir estructurados o en 'características'
-        let serie = equipo.numero_serie;
-        if (!serie && equipo.caracteristicas) {
-            const m = equipo.caracteristicas.match(/N[°º]\s*de\s*Serie:\s*([^|]+)/i);
-            if (m) serie = m[1].trim();
-        }
-
-        let capacidad = equipo.capacidad;
-        if (!capacidad && equipo.caracteristicas) {
-            const m = equipo.caracteristicas.match(/Capacidad:\s*([^|]+)/i);
-            if (m) capacidad = m[1].trim();
-        }
-
-        let baterias = equipo.baterias_cambiadas;
-        if (!baterias && equipo.caracteristicas) {
-            const m = equipo.caracteristicas.match(/Bater[íi]as\s*Reemplazadas:\s*([^|]+)/i);
-            if (m) baterias = m[1].trim();
-        }
-
-        let obs = equipo.observaciones;
-        if (!obs && equipo.caracteristicas) {
-            const m = equipo.caracteristicas.match(/Observaciones:\s*(.+)$/i);
-            if (m) obs = m[1].trim();
-        }
-
-        // 1. Código y Título
+        // 1. Código QR identificador (ej. EQ-UPS-054)
         const codeEl = document.getElementById('qr-modal-code');
         if (codeEl) codeEl.textContent = equipo.codigo_qr || `EQ-ID-${equipo.id}`;
 
+        // 2. Nombre del equipo (ej. Punto UPS - Recinto AS3016)
         const titleEl = document.getElementById('qr-modal-title');
         if (titleEl) titleEl.textContent = equipo.nombre || 'Equipo';
 
-        // 2. Estado
-        const statusEl = document.getElementById('qr-modal-status');
-        if (statusEl) {
-            const estado = (equipo.estado || 'Operativo').trim();
-            statusEl.textContent = estado.toUpperCase();
-            statusEl.className = 'sticker-status-badge ' + (
-                estado.toLowerCase().includes('operativo') ? 'status-operativo' :
-                estado.toLowerCase().includes('critico') || estado.toLowerCase().includes('crítico') ? 'status-critico' :
-                estado.toLowerCase().includes('manten') ? 'status-alerta' : 'status-inactivo'
-            );
-        }
-
-        // 3. Serie y Capacidad
-        const serieEl = document.getElementById('qr-modal-serie');
-        if (serieEl) serieEl.textContent = serie || 'S/N';
-
-        const capEl = document.getElementById('qr-modal-capacidad');
-        if (capEl) capEl.textContent = capacidad || '-';
-
-        // 4. Marca / Modelo
-        const marca = (equipo.marca || '').trim();
-        const modelo = (equipo.modelo || '').trim();
-        const brandModel = (marca && modelo) ? `${marca} · ${modelo}` : (marca || modelo || '-');
-        const brandModelEl = document.getElementById('qr-modal-brand-model');
-        if (brandModelEl) brandModelEl.textContent = brandModel;
-
-        // 5. Recinto y Ubicación
-        const recintoEl = document.getElementById('qr-modal-recinto-ubi');
-        if (recintoEl) recintoEl.textContent = equipo.recinto || equipo.ubicacion || '-';
-
-        // 6. Piso y Sector
-        const pisoSectorEl = document.getElementById('qr-modal-piso-sector');
-        if (pisoSectorEl) {
-            let parts = [];
-            if (equipo.piso) parts.push(`Piso: ${equipo.piso}`);
-            if (equipo.sector) parts.push(`Sector: ${equipo.sector}`);
-            pisoSectorEl.textContent = parts.length > 0 ? parts.join(' · ') : (equipo.ubicacion || '-');
-        }
-
-        // 7. Baterías, Horas y Fecha Instalación
-        const batEl = document.getElementById('qr-modal-baterias');
-        if (batEl) batEl.textContent = baterias || 'No registrado';
-
-        const horasEl = document.getElementById('qr-modal-horas');
-        if (horasEl) horasEl.textContent = `${parseFloat(equipo.horas_trabajo || 0).toFixed(1)} hrs`;
-
-        const instEl = document.getElementById('qr-modal-install');
-        if (instEl) instEl.textContent = equipo.fecha_instalacion || '-';
-
-        // 8. Observaciones
-        const obsEl = document.getElementById('qr-modal-obs');
-        const obsContainer = document.getElementById('qr-modal-obs-container');
-        if (obsEl && obsContainer) {
-            if (obs && obs.trim() && obs !== '-') {
-                obsEl.textContent = obs;
-                obsContainer.style.display = 'flex';
-            } else {
-                obsEl.textContent = 'Sin observaciones adicionales registradas en levantamiento';
-                obsContainer.style.display = 'flex';
-            }
-        }
-
-        // 9. Última Mantención
-        const mantEl = document.getElementById('qr-modal-last-mant');
-        const mantContainer = document.getElementById('qr-modal-last-mant-container');
-        if (mantEl && mantContainer) {
-            if (equipo.ultima_mantencion_fecha) {
-                const tec = equipo.ultima_mantencion_tecnico ? ` (Téc. ${equipo.ultima_mantencion_tecnico})` : '';
-                const tipo = equipo.ultima_mantencion_tipo ? ` [${equipo.ultima_mantencion_tipo}]` : '';
-                const mantObs = equipo.ultima_mantencion_obs ? ` - ${equipo.ultima_mantencion_obs}` : '';
-                mantEl.textContent = `${equipo.ultima_mantencion_fecha}${tipo}${tec}${mantObs}`;
-                mantContainer.style.display = 'flex';
-            } else if (equipo.mantenciones && equipo.mantenciones.length > 0) {
-                const m = equipo.mantenciones[0];
-                const tec = m.nombre_tecnico ? ` (Téc. ${m.nombre_tecnico})` : '';
-                const tipo = m.tipo_mantencion ? ` [${m.tipo_mantencion}]` : '';
-                const mantObs = m.observaciones ? ` - ${m.observaciones}` : '';
-                mantEl.textContent = `${m.fecha_mantencion}${tipo}${tec}${mantObs}`;
-                mantContainer.style.display = 'flex';
-            } else {
-                mantEl.textContent = 'Sin mantenciones previas registradas';
-                mantContainer.style.display = 'flex';
-            }
-        }
-
-        // 10. Generar Código QR Nítido
+        // 3. Generar Código QR Nítido y de Alta Resolución
         const container = document.getElementById('qr-code-canvas-container');
         if (container) {
             container.innerHTML = '';
             new QRCode(container, {
                 text: equipo.codigo_qr || `EQ-${equipo.id}`,
-                width: 170,
-                height: 170,
+                width: 175,
+                height: 175,
                 colorDark: "#000000",
                 colorLight: "#ffffff",
                 correctLevel: QRCode.CorrectLevel.H
