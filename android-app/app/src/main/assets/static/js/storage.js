@@ -1729,7 +1729,7 @@ class LocalDatabase {
     }
 
     init() {
-        const CURRENT_VERSION = 'v7_smart_qr_resolver_1.0.15';
+        const CURRENT_VERSION = 'v8_official_standard_qr_1.0.16';
         let existingEquipos = [];
         try {
             existingEquipos = JSON.parse(localStorage.getItem('cd_local_equipos') || '[]');

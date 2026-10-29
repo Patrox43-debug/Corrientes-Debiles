@@ -317,7 +317,7 @@ class AppController {
         const firstName = (this.currentUser?.nombre || 'Usuario').split(' ')[0];
         const roleName = isAdmin ? 'Administrador' : 'Técnico';
         const isLocal = !window.appStorage || window.appStorage.getMode() === 'local';
-        const currentVer = (window.APP_VERSION || '1.0.15').replace(/^[vV]/, '');
+        const currentVer = (window.APP_VERSION || '1.0.16').replace(/^[vV]/, '');
         const apkFilename = `CDmantencion_v${currentVer}.apk`;
 
         navActions.innerHTML = `
@@ -887,21 +887,48 @@ class AppController {
         const titleEl = document.getElementById('qr-modal-title');
         if (titleEl) titleEl.textContent = equipo.nombre || 'Equipo';
 
-        // 3. Generar Código QR Nítido y de Alta Resolución
+        // 3. Generar Código QR Nítido y de Alta Resolución Estándar (100% Compatible con Todo Teléfono)
         const container = document.getElementById('qr-code-canvas-container');
         if (container) {
             container.innerHTML = '';
             new QRCode(container, {
                 text: equipo.codigo_qr || `EQ-${equipo.id}`,
-                width: 175,
-                height: 175,
+                width: 200,
+                height: 200,
                 colorDark: "#000000",
                 colorLight: "#ffffff",
-                correctLevel: QRCode.CorrectLevel.H
+                correctLevel: QRCode.CorrectLevel.M
             });
         }
 
         this.openModal('qr-view-modal');
+    }
+
+    downloadQrImage() {
+        const code = document.getElementById('qr-modal-code')?.textContent || 'QR-Code';
+        const canvas = document.querySelector('#qr-code-canvas-container canvas');
+        const img = document.querySelector('#qr-code-canvas-container img');
+
+        let dataUrl = '';
+        if (canvas) {
+            try { dataUrl = canvas.toDataURL('image/png'); } catch (e) {}
+        }
+        if (!dataUrl && img && img.src) {
+            dataUrl = img.src;
+        }
+
+        if (!dataUrl) {
+            this.showToast('No se pudo generar la imagen del código QR', 'error');
+            return;
+        }
+
+        const a = document.createElement('a');
+        a.href = dataUrl;
+        a.download = `${code}.png`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        this.showToast(`✓ Imagen descargada: ${code}.png`, 'success');
     }
 
     printQrCard() {
@@ -965,10 +992,10 @@ class AppController {
                     .qr-sticker {
                         background: #ffffff;
                         color: #0f172a;
-                        padding: 1.15rem 1.15rem 1rem;
+                        padding: 1.25rem 1.25rem 1rem;
                         border-radius: 8px;
-                        width: 260px;
-                        max-width: 260px;
+                        width: 280px;
+                        max-width: 280px;
                         border: 1px solid #cbd5e1;
                         text-align: center;
                         display: flex;
@@ -985,17 +1012,17 @@ class AppController {
                         justify-content: center;
                         align-items: center;
                         background: #ffffff;
-                        padding: 0.35rem;
+                        padding: 0.85rem;
                         border: 1px solid #cbd5e1;
-                        border-radius: 6px;
-                        margin-bottom: 0.55rem;
+                        border-radius: 8px;
+                        margin-bottom: 0.65rem;
                         -webkit-print-color-adjust: exact !important;
                         print-color-adjust: exact !important;
                     }
                     .qr-canvas-holder img {
                         display: block;
-                        width: 175px !important;
-                        height: 175px !important;
+                        width: 200px !important;
+                        height: 200px !important;
                     }
                     .sticker-code {
                         font-family: monospace, Courier, monospace;
@@ -2271,7 +2298,7 @@ class AppController {
             if (!res.ok) throw new Error('HTTP ' + res.status);
             const data = await res.json();
             const remoteTag = (data.tag_name || '').trim().replace(/^[vV]/, '');
-            const currentVer = (window.APP_VERSION || '1.0.15').replace(/^[vV]/, '');
+            const currentVer = (window.APP_VERSION || '1.0.16').replace(/^[vV]/, '');
 
             if (this.isNewerVersion(remoteTag, currentVer)) {
                 let apkUrl = 'https://github.com/Patrox43-debug/Corrientes-Debiles/releases/latest/download/CDmantencion.apk';
