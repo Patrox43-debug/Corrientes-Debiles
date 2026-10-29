@@ -13,6 +13,14 @@ const SEED_USERS = [
         password: "admin123",
         rol: "admin",
         creado_en: "2026-10-28 20:00:00"
+    },
+    {
+        id: 2,
+        rut: "16.061.974-5",
+        nombre: "Cristian Aros",
+        password: "1234",
+        rol: "tecnico",
+        creado_en: "2026-10-29 10:40:00"
     }
 ];
 
@@ -1590,7 +1598,7 @@ class LocalDatabase {
             localStorage.setItem('cd_db_seeded_v2', 'true');
         }
 
-        // Asegurar que el Administrador oficial esté siempre presente
+        // Asegurar que los usuarios oficiales estén siempre presentes
         let existingUsers = [];
         try {
             existingUsers = JSON.parse(localStorage.getItem('cd_local_users') || '[]');
@@ -1602,8 +1610,13 @@ class LocalDatabase {
         if (!hasAdmin) {
             existingUsers = existingUsers.filter(u => u.rol !== 'admin');
             existingUsers.unshift(SEED_USERS[0]);
-            localStorage.setItem('cd_local_users', JSON.stringify(existingUsers));
         }
+
+        const hasCristian = existingUsers.some(u => RutUtils.format(u.rut) === '16.061.974-5');
+        if (!hasCristian) {
+            existingUsers.push(SEED_USERS[1]);
+        }
+        localStorage.setItem('cd_local_users', JSON.stringify(existingUsers));
     }
 
     hasUsers() {

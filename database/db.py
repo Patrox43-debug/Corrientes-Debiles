@@ -150,6 +150,17 @@ def init_db():
         """, (admin_rut, admin_hash, datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
         conn.commit()
 
+    # Seed technician user Cristian Aros if not exists
+    tech_rut = normalize_rut("16.061.974-5")
+    cursor.execute("SELECT id FROM usuarios WHERE rut = ?", (tech_rut,))
+    if not cursor.fetchone():
+        tech_hash = hash_password("1234")
+        cursor.execute("""
+            INSERT INTO usuarios (rut, nombre, password_hash, rol, creado_en)
+            VALUES (?, 'Cristian Aros', ?, 'tecnico', ?)
+        """, (tech_rut, tech_hash, datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+        conn.commit()
+
     # Synchronize horas_trabajo on equipos if it is 0
     cursor.execute("""
         UPDATE equipos SET horas_trabajo = (
