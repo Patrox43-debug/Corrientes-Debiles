@@ -139,6 +139,17 @@ def init_db():
             ))
         conn.commit()
 
+    # Seed official administrator if no users exist
+    cursor.execute("SELECT COUNT(*) FROM usuarios")
+    if cursor.fetchone()[0] == 0:
+        admin_rut = normalize_rut("11.111.111-1")
+        admin_hash = hash_password("admin123")
+        cursor.execute("""
+            INSERT INTO usuarios (id, rut, nombre, password_hash, rol, creado_en)
+            VALUES (1, ?, 'Administrador', ?, 'admin', ?)
+        """, (admin_rut, admin_hash, datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+        conn.commit()
+
     # Synchronize horas_trabajo on equipos if it is 0
     cursor.execute("""
         UPDATE equipos SET horas_trabajo = (
