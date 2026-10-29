@@ -36,6 +36,12 @@ class AppController {
         } else {
             this.showLogin();
         }
+
+        // Verificación de actualizaciones en GitHub al iniciar
+        this.setupUpdateListeners();
+        setTimeout(() => {
+            this.checkForUpdates(false);
+        }, 4000);
     }
 
     /* ==========================================================================
@@ -1923,6 +1929,76 @@ class AppController {
                 });
             }
         });
+    }
+
+    /* ==========================================================================
+       ACTUALIZACIONES AUTOMÁTICAS CON GITHUB (WEB & ANDROID APK)
+       ========================================================================== */
+    setupUpdateListeners() {
+        this.onUpdateDownloadProgress = (percent, message) => {
+            this.showToast(message || `Descargando actualización: ${percent}%`, 'info');
+        };
+        this.onUpdateDownloadError = (errorMsg) => {
+            this.showToast(`Error al actualizar: ${errorMsg}`, 'error');
+        };
+        this.onUpdateAvailable = (info) => {
+            console.log('⚡ Nueva actualización encontrada en GitHub:', info);
+        };
+    }
+
+    async checkForUpdates(isManual = false) {
+        // 1. Si estamos ejecutando dentro de la app nativa Android
+        if (window.AndroidBridge && typeof window.AndroidBridge.checkAppUpdate === 'function') {
+            window.AndroidBridge.checkAppUpdate();
+            return;
+        }
+
+        // 2. Si estamos en navegador web
+        try {
+            if (isManual) {
+                this.showToast('Comprobando actualizaciones en GitHub...', 'info');
+            }
+            const res = await fetch('https://api.github.com/repos/Patrox43-debug/Corrientes-Debiles/releases/latest', {
+                headers: { 'Accept': 'application/vnd.github.v3+json' }
+            });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const data = await res.json();
+            const remoteTag = (data.tag_name || '').trim().replace(/^[vV]/, '');
+            const currentVer = (window.APP_VERSION || '1.0.8').replace(/^[vV]/, '');
+
+            if (this.isNewerVersion(remoteTag, currentVer)) {
+                let apkUrl = 'https://github.com/Patrox43-debug/Corrientes-Debiles/releases/latest/download/CDmantencion.apk';
+                if (data.assets && data.assets.length > 0) {
+                    const apkAsset = data.assets.find(a => a.name && a.name.endsWith('.apk'));
+                    if (apkAsset) apkUrl = apkAsset.browser_download_url;
+                }
+                this.showToast(`⚡ Nueva versión v${remoteTag} disponible en GitHub.`, 'success');
+                if (confirm(`Hay una nueva versión de CDmantencion (v${remoteTag}) en GitHub.\n\n¿Deseas descargar el APK actualizado ahora?`)) {
+                    window.location.href = apkUrl;
+                }
+            } else if (isManual) {
+                this.showToast(`CDmantencion está al día en la versión v${currentVer}.`, 'success');
+            }
+        } catch (e) {
+            console.warn('Error al verificar en GitHub:', e);
+            if (isManual) {
+                this.showToast('No se pudo conectar con GitHub en este momento.', 'warning');
+            }
+        }
+    }
+
+    isNewerVersion(remote, current) {
+        if (!remote || !current) return false;
+        const rParts = remote.split('.').map(n => parseInt(n.replace(/\D/g, '') || '0', 10));
+        const cParts = current.split('.').map(n => parseInt(n.replace(/\D/g, '') || '0', 10));
+        const len = Math.max(rParts.length, cParts.length);
+        for (let i = 0; i < len; i++) {
+            const r = rParts[i] || 0;
+            const c = cParts[i] || 0;
+            if (r > c) return true;
+            if (r < c) return false;
+        }
+        return false;
     }
 }
 

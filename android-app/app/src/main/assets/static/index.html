@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Inventario y Mantención | Corrientes Débiles</title>
-    <link rel="stylesheet" href="./css/style.css?v=1.0.8">
+    <link rel="stylesheet" href="./css/style.css?v=1.0.9">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23f97316'><path d='M13 2L3 14h8v8l10-12h-8V2z'/></svg>">
     <link rel="manifest" href="./manifest.json">
     <meta name="theme-color" content="#f97316">
@@ -738,6 +738,14 @@
                         </svg>
                         Descargar APK (CDmantencion.apk)
                     </a>
+                    <button type="button" class="btn btn-outline-orange" style="width: 100%; justify-content: center; margin-top: 0.5rem; padding: 0.5rem; font-size: 0.78rem;" onclick="app.checkForUpdates(true)">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="23 4 23 10 17 10"></polyline>
+                            <polyline points="1 20 1 14 7 14"></polyline>
+                            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                        </svg>
+                        Comprobar Actualizaciones en GitHub
+                    </button>
                 </div>
             </div>
             <div class="modal-footer">
@@ -807,7 +815,8 @@
     <script src="./js/jsqr.min.js"></script>
     <script src="./js/qrscanner.js"></script>
     <script src="./js/rut.js"></script>
-    <script src="./js/storage.js?v=1.0.8"></script>
-    <script src="./js/app.js?v=1.0.8"></script>
+    <script>window.APP_VERSION = "1.0.9";</script>
+    <script src="./js/storage.js?v=1.0.9"></script>
+    <script src="./js/app.js?v=1.0.9"></script>
 </body>
 </html>

@@ -114,6 +114,11 @@ public class MainActivity extends AppCompatActivity {
 
         hideErrorScreen();
         webView.loadUrl(APP_URL);
+
+        // Verificación automática de actualizaciones en GitHub al iniciar la aplicación
+        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+            checkForGitHubUpdate(false);
+        }, 3500);
     }
 
     private void setupStatusBar() {
@@ -592,6 +597,8 @@ public class MainActivity extends AppCompatActivity {
         super.onDestroy();
     }
 
+    private android.app.ProgressDialog updateProgressDialog = null;
+
     public class AndroidBridge {
         @JavascriptInterface
         public boolean isNativeApp() {
@@ -609,6 +616,11 @@ public class MainActivity extends AppCompatActivity {
         }
 
         @JavascriptInterface
+        public void checkAppUpdate() {
+            runOnUiThread(() -> checkForGitHubUpdate(true));
+        }
+
+        @JavascriptInterface
         public void startAppUpdate(String downloadUrl) {
             runOnUiThread(() -> downloadAndInstallApk(downloadUrl));
         }
@@ -620,6 +632,182 @@ public class MainActivity extends AppCompatActivity {
                 webView.loadUrl(APP_URL);
             });
         }
+    }
+
+    private void checkForGitHubUpdate(boolean isManual) {
+        if (!isNetworkAvailable()) {
+            if (isManual) {
+                Toast.makeText(this, "Sin conexión a internet para verificar actualizaciones.", Toast.LENGTH_SHORT).show();
+            }
+            return;
+        }
+
+        new Thread(() -> {
+            HttpURLConnection conn = null;
+            try {
+                // 1. Consultar directamente los releases de GitHub
+                URL url = new URL("https://api.github.com/repos/Patrox43-debug/Corrientes-Debiles/releases/latest");
+                conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("GET");
+                conn.setConnectTimeout(12000);
+                conn.setReadTimeout(15000);
+                conn.setRequestProperty("Accept", "application/vnd.github.v3+json");
+                conn.setRequestProperty("User-Agent", "Mozilla/5.0 CDmantencion-Android-App");
+
+                int code = conn.getResponseCode();
+                String tagName = null;
+                String downloadUrl = null;
+                String releaseNotes = "";
+
+                if (code == HttpURLConnection.HTTP_OK) {
+                    InputStream is = conn.getInputStream();
+                    java.util.Scanner s = new java.util.Scanner(is).useDelimiter("\\A");
+                    String resp = s.hasNext() ? s.next() : "";
+                    is.close();
+
+                    JSONObject json = new JSONObject(resp);
+                    tagName = json.optString("tag_name", "");
+                    releaseNotes = json.optString("body", "");
+
+                    org.json.JSONArray assets = json.optJSONArray("assets");
+                    if (assets != null) {
+                        for (int i = 0; i < assets.length(); i++) {
+                            JSONObject asset = assets.getJSONObject(i);
+                            String assetName = asset.optString("name", "");
+                            if (assetName.endsWith(".apk")) {
+                                downloadUrl = asset.optString("browser_download_url", null);
+                                if (assetName.equals("CDmantencion.apk")) {
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Si no se obtuvo URL por los assets, usar la ruta directa de release
+                if (downloadUrl == null && tagName != null && !tagName.isEmpty()) {
+                    downloadUrl = "https://github.com/Patrox43-debug/Corrientes-Debiles/releases/download/" + tagName + "/CDmantencion.apk";
+                }
+                if (downloadUrl == null) {
+                    downloadUrl = "https://github.com/Patrox43-debug/Corrientes-Debiles/releases/latest/download/CDmantencion.apk";
+                }
+
+                final String finalTag = tagName;
+                final String finalDownloadUrl = downloadUrl;
+                final String finalNotes = releaseNotes;
+
+                if (finalTag != null && isNewerVersion(finalTag, BuildConfig.VERSION_NAME)) {
+                    runOnUiThread(() -> {
+                        showUpdatePromptDialog(finalTag, finalDownloadUrl, finalNotes);
+                    });
+                } else if (isManual) {
+                    runOnUiThread(() -> {
+                        Toast.makeText(MainActivity.this, "CDmantencion ya está actualizado (v" + BuildConfig.VERSION_NAME + ").", Toast.LENGTH_SHORT).show();
+                    });
+                }
+
+            } catch (Exception e) {
+                // Si la API de GitHub falla o excede cuota anónima, consultar el endpoint del servidor
+                checkServerFallbackForUpdate(isManual);
+            } finally {
+                if (conn != null) conn.disconnect();
+            }
+        }).start();
+    }
+
+    private void checkServerFallbackForUpdate(boolean isManual) {
+        new Thread(() -> {
+            HttpURLConnection conn = null;
+            try {
+                URL url = new URL(APP_URL + "/api/app-version");
+                conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("GET");
+                conn.setConnectTimeout(8000);
+                conn.setReadTimeout(10000);
+
+                if (conn.getResponseCode() == HttpURLConnection.HTTP_OK) {
+                    InputStream is = conn.getInputStream();
+                    java.util.Scanner s = new java.util.Scanner(is).useDelimiter("\\A");
+                    String resp = s.hasNext() ? s.next() : "";
+                    is.close();
+
+                    JSONObject json = new JSONObject(resp);
+                    String verName = json.optString("version_name", "");
+                    String downloadUrl = json.optString("download_url", "https://github.com/Patrox43-debug/Corrientes-Debiles/releases/latest/download/CDmantencion.apk");
+
+                    if (!verName.isEmpty() && isNewerVersion(verName, BuildConfig.VERSION_NAME)) {
+                        runOnUiThread(() -> {
+                            showUpdatePromptDialog("v" + verName, downloadUrl, "");
+                        });
+                        return;
+                    }
+                }
+
+                if (isManual) {
+                    runOnUiThread(() -> {
+                        Toast.makeText(MainActivity.this, "CDmantencion ya está en la versión más reciente (v" + BuildConfig.VERSION_NAME + ").", Toast.LENGTH_SHORT).show();
+                    });
+                }
+
+            } catch (Exception ex) {
+                if (isManual) {
+                    runOnUiThread(() -> {
+                        Toast.makeText(MainActivity.this, "No se pudo verificar actualizaciones en este momento.", Toast.LENGTH_SHORT).show();
+                    });
+                }
+            } finally {
+                if (conn != null) conn.disconnect();
+            }
+        }).start();
+    }
+
+    private void showUpdatePromptDialog(String newVersion, String downloadUrl, String notes) {
+        // Notificar también a la interfaz web si estuviera escuchando
+        if (webView != null) {
+            String script = String.format(
+                    Locale.US,
+                    "if (window.app && window.app.onUpdateAvailable) { window.app.onUpdateAvailable({ version: '%s', downloadUrl: '%s' }); }",
+                    newVersion.replaceAll("['\"]", ""),
+                    downloadUrl.replaceAll("['\"]", "")
+            );
+            webView.evaluateJavascript(script, null);
+        }
+
+        String msg = "Se ha detectado una nueva versión en GitHub: " + newVersion + "\n(Tu versión actual instalada: v" + BuildConfig.VERSION_NAME + ").\n\n¿Deseas descargar e instalar la actualización ahora?";
+
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("⚡ Actualización de CDmantencion")
+                .setMessage(msg)
+                .setPositiveButton("Actualizar Ahora", (dialog, which) -> {
+                    downloadAndInstallApk(downloadUrl);
+                })
+                .setNegativeButton("Más tarde", null)
+                .setCancelable(true)
+                .show();
+    }
+
+    private boolean isNewerVersion(String remoteTag, String currentVersion) {
+        if (remoteTag == null || currentVersion == null) return false;
+        String cleanRemote = remoteTag.trim().replaceAll("^[vV]", "");
+        String cleanCurrent = currentVersion.trim().replaceAll("^[vV]", "");
+        if (cleanRemote.equalsIgnoreCase(cleanCurrent)) return false;
+
+        String[] rParts = cleanRemote.split("\\.");
+        String[] cParts = cleanCurrent.split("\\.");
+        int len = Math.max(rParts.length, cParts.length);
+        for (int i = 0; i < len; i++) {
+            int r = 0;
+            int c = 0;
+            try {
+                if (i < rParts.length) r = Integer.parseInt(rParts[i].replaceAll("[^0-9]", ""));
+            } catch (Exception ignored) {}
+            try {
+                if (i < cParts.length) c = Integer.parseInt(cParts[i].replaceAll("[^0-9]", ""));
+            } catch (Exception ignored) {}
+            if (r > c) return true;
+            if (r < c) return false;
+        }
+        return false;
     }
 
     private void installApkFile(File apkFile) {
@@ -661,7 +849,27 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void downloadAndInstallApk(String apkUrl) {
-        Toast.makeText(this, "Descargando actualización de CDmantencion...", Toast.LENGTH_SHORT).show();
+        if (apkUrl == null || apkUrl.trim().isEmpty()) {
+            Toast.makeText(this, "URL de actualización no válida.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        runOnUiThread(() -> {
+            try {
+                if (updateProgressDialog != null && updateProgressDialog.isShowing()) {
+                    updateProgressDialog.dismiss();
+                }
+                updateProgressDialog = new android.app.ProgressDialog(MainActivity.this);
+                updateProgressDialog.setTitle("Actualizando CDmantencion");
+                updateProgressDialog.setMessage("Conectando con GitHub...");
+                updateProgressDialog.setProgressStyle(android.app.ProgressDialog.STYLE_HORIZONTAL);
+                updateProgressDialog.setMax(100);
+                updateProgressDialog.setProgress(0);
+                updateProgressDialog.setCancelable(false);
+                updateProgressDialog.setCanceledOnTouchOutside(false);
+                updateProgressDialog.show();
+            } catch (Exception ignored) {}
+        });
 
         new Thread(() -> {
             InputStream input = null;
@@ -671,13 +879,13 @@ public class MainActivity extends AppCompatActivity {
             try {
                 String currentUrl = apkUrl;
                 int redirectCount = 0;
-                while (redirectCount < 5) {
+                while (redirectCount < 6) {
                     URL u = new URL(currentUrl);
                     connection = (HttpURLConnection) u.openConnection();
                     connection.setInstanceFollowRedirects(true);
-                    connection.setConnectTimeout(20000);
-                    connection.setReadTimeout(30000);
-                    connection.setRequestProperty("User-Agent", "Mozilla/5.0 CDmantencion-Android-Updater");
+                    connection.setConnectTimeout(25000);
+                    connection.setReadTimeout(35000);
+                    connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android) CDmantencion-Updater");
 
                     int status = connection.getResponseCode();
                     if (status == HttpURLConnection.HTTP_MOVED_TEMP ||
@@ -690,7 +898,7 @@ public class MainActivity extends AppCompatActivity {
                         continue;
                     }
                     if (status != HttpURLConnection.HTTP_OK) {
-                        throw new IOException("El servidor respondió con código HTTP " + status);
+                        throw new IOException("Error HTTP " + status + " al descargar APK desde GitHub");
                     }
                     break;
                 }
@@ -704,7 +912,7 @@ public class MainActivity extends AppCompatActivity {
                     downloadDir.mkdirs();
                 }
 
-                File apkFile = new File(downloadDir, "cdmantencion_update.apk");
+                File apkFile = new File(downloadDir, "CDmantencion_update.apk");
                 if (apkFile.exists()) {
                     apkFile.delete();
                 }
@@ -722,12 +930,12 @@ public class MainActivity extends AppCompatActivity {
                     output.write(data, 0, count);
 
                     long now = System.currentTimeMillis();
-                    if (now - lastReportTime > 200) {
+                    if (now - lastReportTime > 250) {
                         if (fileLength > 0) {
                             int percent = (int) (total * 100 / fileLength);
                             reportDownloadProgress(percent, String.format(Locale.US, "Descargando: %d%% (%.1f / %.1f MB)", percent, total / (1024.0 * 1024.0), fileLength / (1024.0 * 1024.0)));
                         } else {
-                            reportDownloadProgress(50, String.format(Locale.US, "Descargando: %.1f MB", total / (1024.0 * 1024.0)));
+                            reportDownloadProgress(50, String.format(Locale.US, "Descargando: %.1f MB...", total / (1024.0 * 1024.0)));
                         }
                         lastReportTime = now;
                     }
@@ -752,7 +960,12 @@ public class MainActivity extends AppCompatActivity {
                 reportDownloadProgress(100, "Descarga completada. Abriendo instalador...");
 
                 runOnUiThread(() -> {
-                    Toast.makeText(MainActivity.this, "Descarga completada. Abriendo instalador...", Toast.LENGTH_SHORT).show();
+                    try {
+                        if (updateProgressDialog != null && updateProgressDialog.isShowing()) {
+                            updateProgressDialog.dismiss();
+                            updateProgressDialog = null;
+                        }
+                    } catch (Exception ignored) {}
                     installApkFile(apkFile);
                 });
 
@@ -770,6 +983,16 @@ public class MainActivity extends AppCompatActivity {
 
     private void reportDownloadProgress(int percent, String message) {
         runOnUiThread(() -> {
+            if (updateProgressDialog != null && updateProgressDialog.isShowing()) {
+                updateProgressDialog.setProgress(percent);
+                if (message != null) {
+                    updateProgressDialog.setMessage(message);
+                }
+                if (percent >= 100) {
+                    updateProgressDialog.dismiss();
+                    updateProgressDialog = null;
+                }
+            }
             if (webView != null) {
                 String safeMsg = JSONObject.quote(message != null ? message : "");
                 String script = "if (window.app && window.app.onUpdateDownloadProgress) { window.app.onUpdateDownloadProgress(" + percent + ", " + safeMsg + "); }";
@@ -780,6 +1003,10 @@ public class MainActivity extends AppCompatActivity {
 
     private void reportDownloadError(String errorMsg) {
         runOnUiThread(() -> {
+            if (updateProgressDialog != null && updateProgressDialog.isShowing()) {
+                updateProgressDialog.dismiss();
+                updateProgressDialog = null;
+            }
             Toast.makeText(MainActivity.this, "Error de actualización: " + errorMsg, Toast.LENGTH_LONG).show();
             if (webView != null) {
                 String safeMsg = JSONObject.quote(errorMsg != null ? errorMsg : "Error desconocido");
