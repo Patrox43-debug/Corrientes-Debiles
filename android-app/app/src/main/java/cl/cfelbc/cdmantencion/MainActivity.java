@@ -155,7 +155,11 @@ public class MainActivity extends AppCompatActivity {
                 new ActivityResultContracts.RequestPermission(),
                 isGranted -> {
                     if (isGranted && currentPermissionRequest != null) {
-                        currentPermissionRequest.grant(currentPermissionRequest.getResources());
+                        try {
+                            currentPermissionRequest.grant(new String[]{PermissionRequest.RESOURCE_VIDEO_CAPTURE});
+                        } catch (Exception e) {
+                            try { currentPermissionRequest.grant(currentPermissionRequest.getResources()); } catch (Exception ignored) {}
+                        }
                     } else if (currentPermissionRequest != null) {
                         currentPermissionRequest.deny();
                     }
@@ -233,9 +237,18 @@ public class MainActivity extends AppCompatActivity {
 
         webView.addJavascriptInterface(new AndroidBridge(), "AndroidBridge");
 
+        final androidx.webkit.WebViewAssetLoader assetLoader = new androidx.webkit.WebViewAssetLoader.Builder()
+                .addPathHandler("/assets/", new androidx.webkit.WebViewAssetLoader.AssetsPathHandler(this))
+                .build();
+
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
+                WebResourceResponse assetLoaderResp = assetLoader.shouldInterceptRequest(request.getUrl());
+                if (assetLoaderResp != null) {
+                    return assetLoaderResp;
+                }
+
                 Uri uri = request.getUrl();
                 String path = uri.getPath();
                 if (path == null || path.isEmpty()) path = "/";
@@ -289,8 +302,8 @@ public class MainActivity extends AppCompatActivity {
             public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
                 super.onReceivedError(view, request, error);
                 if (request.isForMainFrame()) {
-                    // Fallback directo a la versión local embebida para funcionamiento 100% offline
-                    view.loadUrl("file:///android_asset/index.html");
+                    // Fallback directo a la versión local embebida con origen HTTPS seguro para permitir cámara WebRTC
+                    view.loadUrl("https://appassets.androidplatform.net/assets/index.html");
                 }
             }
 
@@ -383,14 +396,20 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void onPermissionRequest(final PermissionRequest request) {
-                currentPermissionRequest = request;
-                if (ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.CAMERA)
-                        == PackageManager.PERMISSION_GRANTED) {
-                    request.grant(request.getResources());
-                    currentPermissionRequest = null;
-                } else {
-                    cameraPermissionLauncher.launch(Manifest.permission.CAMERA);
-                }
+                MainActivity.this.runOnUiThread(() -> {
+                    currentPermissionRequest = request;
+                    if (ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.CAMERA)
+                            == PackageManager.PERMISSION_GRANTED) {
+                        try {
+                            request.grant(new String[]{PermissionRequest.RESOURCE_VIDEO_CAPTURE});
+                        } catch (Exception e) {
+                            try { request.grant(request.getResources()); } catch (Exception ignored) {}
+                        }
+                        currentPermissionRequest = null;
+                    } else {
+                        cameraPermissionLauncher.launch(Manifest.permission.CAMERA);
+                    }
+                });
             }
 
             @Override
@@ -630,6 +649,20 @@ public class MainActivity extends AppCompatActivity {
             runOnUiThread(() -> {
                 hideErrorScreen();
                 webView.loadUrl(APP_URL);
+            });
+        }
+
+        @JavascriptInterface
+        public boolean hasCameraPermission() {
+            return ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED;
+        }
+
+        @JavascriptInterface
+        public void requestCameraPermission() {
+            runOnUiThread(() -> {
+                if (ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+                    cameraPermissionLauncher.launch(Manifest.permission.CAMERA);
+                }
             });
         }
     }

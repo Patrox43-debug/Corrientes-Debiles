@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Inventario y Mantención | Corrientes Débiles</title>
-    <link rel="stylesheet" href="./css/style.css?v=1.0.13">
+    <link rel="stylesheet" href="./css/style.css?v=1.0.14">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23f97316'><path d='M13 2L3 14h8v8l10-12h-8V2z'/></svg>">
     <link rel="manifest" href="./manifest.json">
     <meta name="theme-color" content="#f97316">
@@ -130,12 +130,12 @@
                             </svg>
                             Recargar Datos
                         </a>
-                        <a href="/CDmantencion.apk" download="CDmantencion_v1.0.13.apk" class="btn btn-outline-orange" style="font-size: 0.75rem; padding: 0.35rem 0.65rem; text-decoration: none;" title="Descargar APK CDmantencion para Android">
+                        <a href="/CDmantencion.apk" download="CDmantencion_v1.0.14.apk" class="btn btn-outline-orange" style="font-size: 0.75rem; padding: 0.35rem 0.65rem; text-decoration: none;" title="Descargar APK CDmantencion para Android">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
                                 <line x1="12" y1="18" x2="12.01" y2="18"></line>
                             </svg>
-                            Descargar APK v1.0.13
+                            Descargar APK v1.0.14
                         </a>
                     </div>
                 </div>
@@ -288,30 +288,41 @@
             </div>
             <div class="modal-body">
                 <div class="scanner-viewport-wrapper">
-                    <video id="scanner-video" class="scanner-video" playsinline></video>
-                    <div class="scanner-overlay">
+                    <div id="qr-reader" class="scanner-qr-reader"></div>
+                    <video id="scanner-video" class="scanner-video" playsinline style="display: none;"></video>
+                    <div class="scanner-overlay" id="scanner-reticle-overlay">
                         <div class="scanner-reticle"></div>
                     </div>
                 </div>
 
-                <div id="camera-status-msg" style="text-align: center; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem;">
+                <div id="camera-status-msg" style="text-align: center; font-size: 0.82rem; color: var(--text-muted); margin-bottom: 1rem;">
                     Apunte la cámara al código QR ubicado en el chasis del equipo.
                 </div>
 
-                <div style="display: flex; gap: 0.75rem; justify-content: center; margin-bottom: 1.5rem; flex-wrap: wrap;">
+                <div style="display: flex; gap: 0.6rem; justify-content: center; margin-bottom: 1.25rem; flex-wrap: wrap;">
+                    <label class="btn btn-primary btn-sm" style="cursor: pointer; font-weight: 600;" title="Abrir cámara del teléfono para capturar una foto nítida de la etiqueta">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                            <circle cx="12" cy="13" r="4"></circle>
+                        </svg>
+                        Tomar Foto con Cámara
+                        <input type="file" id="scanner-camera-input" accept="image/*" capture="environment" style="display: none;">
+                    </label>
+
                     <button type="button" id="scanner-torch-btn" class="btn btn-secondary btn-sm" style="display: none;" onclick="app.toggleScannerTorch()">
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
                         </svg>
                         <span id="scanner-torch-text">Linterna</span>
                     </button>
+
                     <label class="btn btn-secondary btn-sm" style="cursor: pointer;">
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
                             <circle cx="8.5" cy="8.5" r="1.5"></circle>
                             <polyline points="21 15 16 10 5 21"></polyline>
                         </svg>
-                        Cargar Foto / Imagen
+                        Galería
                         <input type="file" id="scanner-file-input" accept="image/*" style="display: none;">
                     </label>
                 </div>
@@ -736,13 +747,13 @@
                     <p style="font-size: 0.76rem; color: var(--text-secondary); margin-bottom: 0.75rem; line-height: 1.35;">
                         Descarga la aplicación oficial <strong>CDmantencion</strong> para tu teléfono Android. Se conecta al servidor mantencion.cfelbc.cl y cuenta con soporte 100% offline y escáner de códigos QR.
                     </p>
-                    <a href="/CDmantencion.apk" download="CDmantencion_v1.0.13.apk" class="btn btn-primary" style="width: 100%; justify-content: center; text-decoration: none; padding: 0.6rem;">
+                    <a href="/CDmantencion.apk" download="CDmantencion_v1.0.14.apk" class="btn btn-primary" style="width: 100%; justify-content: center; text-decoration: none; padding: 0.6rem;">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                             <polyline points="7 10 12 15 17 10"></polyline>
                             <line x1="12" y1="15" x2="12" y2="3"></line>
                         </svg>
-                        Descargar APK (CDmantencion_v1.0.13.apk)
+                        Descargar APK (CDmantencion_v1.0.14.apk)
                     </a>
                     <button type="button" class="btn btn-outline-orange" style="width: 100%; justify-content: center; margin-top: 0.5rem; padding: 0.5rem; font-size: 0.78rem;" onclick="app.checkForUpdates(true)">
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -818,11 +829,12 @@
 
     <!-- JAVASCRIPT ASSETS -->
     <script src="./js/qrcode.min.js"></script>
+    <script src="./js/html5-qrcode.min.js"></script>
     <script src="./js/jsqr.min.js"></script>
     <script src="./js/qrscanner.js"></script>
     <script src="./js/rut.js"></script>
-    <script>window.APP_VERSION = "1.0.13";</script>
-    <script src="./js/storage.js?v=1.0.13"></script>
-    <script src="./js/app.js?v=1.0.13"></script>
+    <script>window.APP_VERSION = "1.0.14";</script>
+    <script src="./js/storage.js?v=1.0.14"></script>
+    <script src="./js/app.js?v=1.0.14"></script>
 </body>
 </html>

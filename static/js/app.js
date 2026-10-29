@@ -317,7 +317,7 @@ class AppController {
         const firstName = (this.currentUser?.nombre || 'Usuario').split(' ')[0];
         const roleName = isAdmin ? 'Administrador' : 'Técnico';
         const isLocal = !window.appStorage || window.appStorage.getMode() === 'local';
-        const currentVer = (window.APP_VERSION || '1.0.13').replace(/^[vV]/, '');
+        const currentVer = (window.APP_VERSION || '1.0.14').replace(/^[vV]/, '');
         const apkFilename = `CDmantencion_v${currentVer}.apk`;
 
         navActions.innerHTML = `
@@ -1058,7 +1058,6 @@ class AppController {
 
     openQrScanner() {
         this.openModal('qr-scanner-modal');
-        const video = document.getElementById('scanner-video');
         const statusMsg = document.getElementById('camera-status-msg');
         const torchBtn = document.getElementById('scanner-torch-btn');
         const torchText = document.getElementById('scanner-torch-text');
@@ -1066,18 +1065,32 @@ class AppController {
         if (torchBtn) torchBtn.style.display = 'none';
         if (torchText) torchText.textContent = 'Linterna';
 
-        statusMsg.textContent = 'Iniciando cámara en máxima calidad...';
-        this.qrScanner.startCamera(video, (detectedCode) => {
+        if (statusMsg) {
+            statusMsg.innerHTML = '<span style="color:var(--orange-primary);">● Conectando cámara en alta definición...</span>';
+        }
+
+        // Si corre dentro del APK nativo y no tiene permiso, solicitarlo a Android
+        if (window.AndroidBridge && typeof window.AndroidBridge.hasCameraPermission === 'function') {
+            if (!window.AndroidBridge.hasCameraPermission()) {
+                window.AndroidBridge.requestCameraPermission();
+            }
+        }
+
+        this.qrScanner.startCamera('qr-reader', (detectedCode) => {
             this.handleQrDetected(detectedCode);
         }).then(res => {
             if (res.success) {
-                const resLabel = res.width && res.height ? ` (${res.width}x${res.height})` : '';
-                statusMsg.textContent = `Cámara activa en máxima calidad${resLabel}. Alinee el código QR en el visor.`;
+                const engine = res.engine ? ` (${res.engine})` : '';
+                if (statusMsg) {
+                    statusMsg.innerHTML = `<span style="color:#10b981; font-weight:600;">✓ Cámara activa${engine}</span>. Alinee el código en el visor o use <b>Tomar Foto</b>.`;
+                }
                 if (res.hasTorch && torchBtn) {
                     torchBtn.style.display = 'inline-flex';
                 }
             } else {
-                statusMsg.textContent = res.error || 'Cámara no disponible.';
+                if (statusMsg) {
+                    statusMsg.innerHTML = `<span style="color:#ef4444; font-weight:600;">⚠ ${res.error || 'Cámara en vivo no disponible'}</span><br><span style="color:var(--orange-primary); font-weight:600;">Presione el botón "Tomar Foto con Cámara" para escanear directamente.</span>`;
+                }
             }
         });
     }
@@ -2075,13 +2088,27 @@ class AppController {
         const userRutInput = document.getElementById('user-form-rut');
         if (userRutInput) RutUtils.attachToInput(userRutInput);
 
-        // Scanner file input
+        // Scanner camera & file inputs
+        const cameraInput = document.getElementById('scanner-camera-input');
+        if (cameraInput) {
+            cameraInput.addEventListener('change', async (e) => {
+                if (e.target.files && e.target.files[0]) {
+                    this.showToast('Procesando foto de la cámara...', 'info');
+                    const code = await this.qrScanner.scanFile(e.target.files[0]);
+                    if (code) this.handleQrDetected(code);
+                    cameraInput.value = '';
+                }
+            });
+        }
+
         const fileInput = document.getElementById('scanner-file-input');
         if (fileInput) {
             fileInput.addEventListener('change', async (e) => {
                 if (e.target.files && e.target.files[0]) {
+                    this.showToast('Analizando imagen de galería...', 'info');
                     const code = await this.qrScanner.scanFile(e.target.files[0]);
                     if (code) this.handleQrDetected(code);
+                    fileInput.value = '';
                 }
             });
         }
@@ -2153,7 +2180,7 @@ class AppController {
             if (!res.ok) throw new Error('HTTP ' + res.status);
             const data = await res.json();
             const remoteTag = (data.tag_name || '').trim().replace(/^[vV]/, '');
-            const currentVer = (window.APP_VERSION || '1.0.13').replace(/^[vV]/, '');
+            const currentVer = (window.APP_VERSION || '1.0.14').replace(/^[vV]/, '');
 
             if (this.isNewerVersion(remoteTag, currentVer)) {
                 let apkUrl = 'https://github.com/Patrox43-debug/Corrientes-Debiles/releases/latest/download/CDmantencion.apk';
