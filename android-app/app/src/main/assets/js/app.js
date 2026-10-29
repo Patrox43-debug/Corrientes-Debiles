@@ -95,17 +95,25 @@ class AppController {
         submitBtn.disabled = true;
         submitBtn.innerHTML = 'Validando acceso...';
 
-        // Intento 1: Si hay servidor HTTP disponible, autenticar contra la API
-        if (typeof window !== 'undefined' && window.location && window.location.protocol.startsWith('http')) {
+        const isDesktopLocalhost = typeof window !== 'undefined' && 
+                                   window.location && 
+                                   (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+        const isCloudMode = window.appStorage && window.appStorage.getMode() === 'cloud';
+
+        // Intento 1: Si estamos en Modo Nube explícito o en localhost del navegador de escritorio
+        if (isCloudMode || isDesktopLocalhost) {
             try {
-                const cloudUrl = (window.appStorage && window.appStorage.getMode() === 'cloud') 
-                    ? window.appStorage.getCloudUrl() 
-                    : '';
+                const cloudUrl = isCloudMode ? window.appStorage.getCloudUrl() : '';
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 3000);
+
                 const res = await fetch(`${cloudUrl}/api/login`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ rut, password })
+                    body: JSON.stringify({ rut, password }),
+                    signal: controller.signal
                 });
+                clearTimeout(timeoutId);
                 const data = await res.json();
 
                 if (res.ok && data.success) {
@@ -375,13 +383,21 @@ class AppController {
     async loadStats() {
         let loaded = false;
 
-        // Intentar consultar estadísticas al servidor API si hay red disponible
-        if (typeof window !== 'undefined' && window.location && window.location.protocol.startsWith('http')) {
+        const isDesktopLocalhost = typeof window !== 'undefined' && 
+                                   window.location && 
+                                   (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+        const isCloudMode = window.appStorage && window.appStorage.getMode() === 'cloud';
+
+        // Consultar API solo en Modo Nube o en servidor localhost de escritorio
+        if (isCloudMode || isDesktopLocalhost) {
             try {
-                const cloudUrl = (window.appStorage && window.appStorage.getMode() === 'cloud') 
-                    ? window.appStorage.getCloudUrl() 
-                    : '';
-                const res = await fetch(`${cloudUrl}/api/stats`);
+                const cloudUrl = isCloudMode ? window.appStorage.getCloudUrl() : '';
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 2500);
+
+                const res = await fetch(`${cloudUrl}/api/stats`, { signal: controller.signal });
+                clearTimeout(timeoutId);
+
                 if (res.ok) {
                     const data = await res.json();
                     if (data.success && data.stats) {
@@ -402,7 +418,7 @@ class AppController {
             }
         }
 
-        // Si no se pudo obtener del servidor, usar base de datos local
+        // Modo Local o sin conexión: usar base de datos local instantáneamente
         if (!loaded && window.appStorage && window.appStorage.localDb) {
             const s = window.appStorage.localDb.getStats();
             const totalEl = document.getElementById('stat-total-equipos');
@@ -421,16 +437,24 @@ class AppController {
         const search = (searchInput ? searchInput.value : '').trim();
         let loaded = false;
 
-        // Intentar consultar al servidor API primero si hay conexión
-        if (typeof window !== 'undefined' && window.location && window.location.protocol.startsWith('http')) {
+        const isDesktopLocalhost = typeof window !== 'undefined' && 
+                                   window.location && 
+                                   (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+        const isCloudMode = window.appStorage && window.appStorage.getMode() === 'cloud';
+
+        // Consultar API solo en Modo Nube o en servidor localhost de escritorio
+        if (isCloudMode || isDesktopLocalhost) {
             try {
-                const cloudUrl = (window.appStorage && window.appStorage.getMode() === 'cloud') 
-                    ? window.appStorage.getCloudUrl() 
-                    : '';
+                const cloudUrl = isCloudMode ? window.appStorage.getCloudUrl() : '';
                 const params = new URLSearchParams();
                 if (search) params.append('search', search);
 
-                const res = await fetch(`${cloudUrl}/api/equipos?${params.toString()}`);
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 2500);
+
+                const res = await fetch(`${cloudUrl}/api/equipos?${params.toString()}`, { signal: controller.signal });
+                clearTimeout(timeoutId);
+
                 if (res.ok) {
                     const data = await res.json();
                     if (data.success && Array.isArray(data.equipos)) {
@@ -449,7 +473,7 @@ class AppController {
             }
         }
 
-        // Si estamos sin red o en la app offline, recurrir a base de datos local
+        // Modo Local (APK en celular) o sin conexión: carga instantánea de 54 equipos UPS reales
         if (!loaded && window.appStorage && window.appStorage.localDb) {
             this.equipos = window.appStorage.localDb.getEquipos(search);
             this.renderEquipos();
@@ -788,13 +812,21 @@ class AppController {
         this.showToast(`Código detectado: ${code}`, 'success');
         let found = false;
 
-        // Intentar consultar al servidor API primero si hay conexión
-        if (typeof window !== 'undefined' && window.location && window.location.protocol.startsWith('http')) {
+        const isDesktopLocalhost = typeof window !== 'undefined' && 
+                                   window.location && 
+                                   (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+        const isCloudMode = window.appStorage && window.appStorage.getMode() === 'cloud';
+
+        // Consultar API solo en Modo Nube o en servidor localhost de escritorio
+        if (isCloudMode || isDesktopLocalhost) {
             try {
-                const cloudUrl = (window.appStorage && window.appStorage.getMode() === 'cloud') 
-                    ? window.appStorage.getCloudUrl() 
-                    : '';
-                const res = await fetch(`${cloudUrl}/api/equipos/qr/${encodeURIComponent(code)}`);
+                const cloudUrl = isCloudMode ? window.appStorage.getCloudUrl() : '';
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 2500);
+
+                const res = await fetch(`${cloudUrl}/api/equipos/qr/${encodeURIComponent(code)}`, { signal: controller.signal });
+                clearTimeout(timeoutId);
+
                 if (res.ok) {
                     const data = await res.json();
                     if (data.success && data.equipo) {
@@ -809,7 +841,7 @@ class AppController {
             }
         }
 
-        // Si no se encontró en servidor o no hay red, buscar en base local
+        // Modo Local o fallback: buscar en base de datos local
         if (!found && window.appStorage && window.appStorage.localDb) {
             const eq = window.appStorage.localDb.getEquipoByCode(code);
             if (eq) {

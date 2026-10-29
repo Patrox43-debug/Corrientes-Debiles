@@ -2,7 +2,7 @@
  * Corrientes Débiles - Service Worker v5
  * Network-First Strategy to ensure live data with offline fallback
  */
-const CACHE_NAME = 'corrientes-debiles-v5';
+const CACHE_NAME = 'corrientes-debiles-v6';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();

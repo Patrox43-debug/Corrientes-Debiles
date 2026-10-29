@@ -1562,7 +1562,7 @@ class LocalDatabase {
     }
 
     init() {
-        const CURRENT_VERSION = 'v5_ups_54_production';
+        const CURRENT_VERSION = 'v6_ups_54_production';
         let existingEquipos = [];
         try {
             existingEquipos = JSON.parse(localStorage.getItem('cd_local_equipos') || '[]');

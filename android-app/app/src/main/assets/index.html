@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Inventario y Mantención | Corrientes Débiles</title>
-    <link rel="stylesheet" href="./css/style.css?v=1.0.4">
+    <link rel="stylesheet" href="./css/style.css?v=1.0.5">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23f97316'><path d='M13 2L3 14h8v8l10-12h-8V2z'/></svg>">
     <link rel="manifest" href="./manifest.json">
     <meta name="theme-color" content="#f97316">
@@ -16,21 +16,21 @@
         if ('caches' in window) {
             caches.keys().then(keys => {
                 keys.forEach(k => {
-                    if (k !== 'corrientes-debiles-v5') caches.delete(k);
+                    if (k !== 'corrientes-debiles-v6') caches.delete(k);
                 });
             });
         }
         // Limpieza de datos de prueba obsoletos en localStorage
         try {
             const rawEq = localStorage.getItem('cd_local_equipos');
-            if (rawEq && (rawEq.indexOf('EQ-CCTV') !== -1 || rawEq.indexOf('EQ-ACS') !== -1 || !localStorage.getItem('cd_ups_v5'))) {
+            if (rawEq && (rawEq.indexOf('EQ-CCTV') !== -1 || rawEq.indexOf('EQ-ACS') !== -1 || !localStorage.getItem('cd_ups_v6'))) {
                 localStorage.removeItem('cd_local_equipos');
                 localStorage.removeItem('cd_local_mantenciones');
                 localStorage.removeItem('cd_db_seeded_v2');
                 localStorage.removeItem('cd_db_seeded_version');
                 localStorage.removeItem('auth_user');
                 localStorage.removeItem('auth_token');
-                localStorage.setItem('cd_ups_v5', 'true');
+                localStorage.setItem('cd_ups_v6', 'true');
             }
         } catch(e) {}
     </script>
@@ -810,7 +810,7 @@
     <script src="./js/jsqr.min.js"></script>
     <script src="./js/qrscanner.js"></script>
     <script src="./js/rut.js"></script>
-    <script src="./js/storage.js?v=1.0.4"></script>
-    <script src="./js/app.js?v=1.0.4"></script>
+    <script src="./js/storage.js?v=1.0.5"></script>
+    <script src="./js/app.js?v=1.0.5"></script>
 </body>
 </html>

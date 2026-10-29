@@ -97,6 +97,18 @@ public class MainActivity extends AppCompatActivity {
         initViews();
         setupLaunchers();
         setupWebView();
+
+        // Limpieza de datos y caché antigua al actualizar de versión para forzar datos limpios
+        android.content.SharedPreferences prefs = getSharedPreferences("cd_app_prefs", MODE_PRIVATE);
+        int lastCode = prefs.getInt("version_code", 0);
+        if (lastCode < 6) {
+            webView.clearCache(true);
+            try {
+                android.webkit.WebStorage.getInstance().deleteAllData();
+            } catch (Exception ignored) {}
+            prefs.edit().putInt("version_code", 6).apply();
+        }
+
         setupSwipeRefresh();
         setupBackNavigation();
 
@@ -199,7 +211,7 @@ public class MainActivity extends AppCompatActivity {
         settings.setSupportZoom(false);
         settings.setBuiltInZoomControls(false);
         settings.setDisplayZoomControls(false);
-        settings.setCacheMode(WebSettings.LOAD_DEFAULT);
+        settings.setCacheMode(WebSettings.LOAD_NO_CACHE);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
         settings.setMediaPlaybackRequiresUserGesture(false);
 
@@ -224,10 +236,14 @@ public class MainActivity extends AppCompatActivity {
                 if (path == null || path.isEmpty()) path = "/";
 
                 String cleanPath = path;
-                if (cleanPath.startsWith("/static/")) {
-                    cleanPath = cleanPath.substring(8);
-                } else if (cleanPath.startsWith("/")) {
+                if (cleanPath.startsWith("/")) {
                     cleanPath = cleanPath.substring(1);
+                }
+                if (cleanPath.startsWith("android_asset/")) {
+                    cleanPath = cleanPath.substring(14);
+                }
+                if (cleanPath.startsWith("static/")) {
+                    cleanPath = cleanPath.substring(7);
                 }
 
                 int qIdx = cleanPath.indexOf('?');
