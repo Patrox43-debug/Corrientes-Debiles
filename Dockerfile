@@ -31,7 +31,7 @@ ENV DB_PATH=/app/data/inventario.db
 VOLUME ["/app/data"]
 
 # Puerto oficial expuesto
-EXPOSE 8080
+EXPOSE 8080 8000
 
 # Comprobación de salud nativa de Docker para Coolify / Traefik
 HEALTHCHECK --interval=20s --timeout=5s --start-period=15s --retries=5 \

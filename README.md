@@ -94,23 +94,46 @@ Luego abre tu navegador en:
 
 ## ☁️ Despliegue en Producción con Coolify
 
-La aplicación está lista para desplegarse directamente en **Coolify** bajo el dominio oficial:
+La aplicación está completamente configurada para desplegarse en **Coolify** de la misma manera que el sistema EEMM, bajo el dominio oficial:
 👉 **`https://mantencion.cfelbc.cl`**
 
-### Pasos de Configuración en Coolify:
-1. **Conectar Repositorio**: En el panel de Coolify, crea un nuevo recurso tipo **Application** apuntando al repositorio de GitHub: `Patrox43-debug/Corrientes-Debiles`.
-2. **Dominio Asignado (FQDN)**: Configura el dominio:
+### Parámetros de Configuración en Coolify:
+
+1. **Nuevo Recurso en Coolify**:
+   - En tu panel de Coolify, pulsa en **+ New Resource** > **Application**.
+   - Selecciona **Public Repository** o conecta con tu cuenta de GitHub.
+   - URL del Repositorio: `https://github.com/Patrox43-debug/Corrientes-Debiles`
+   - Rama (*Branch*): `main`
+
+2. **Dominio Asignado (FQDN)**:
    ```text
    https://mantencion.cfelbc.cl
    ```
-3. **Build Pack**: Selecciona **`Dockerfile`** o **`Docker Compose`** (ambos esquemas se encuentran configurados en la raíz).
-4. **Puerto Expuesto**: Configura el puerto del contenedor en **`8080`**.
+   *(Coolify y Traefik generarán y renovarán automáticamente el certificado SSL Let's Encrypt).*
+
+3. **Build Pack**:
+   - Selecciona **`Dockerfile`** (o `Docker Compose`).
+
+4. **Puerto Expuesto (Ports Exposes)**:
+   - Configura el puerto en: **`8080`** (o `8080:8080`).
+
 5. **Verificación de Salud (Health Check)**:
-   - Ruta: `/api/health`
-6. **Almacenamiento Persistente (Persistent Volume / Storage)**:
-   - Destino en contenedor: `/app/data`
-   - Variable de entorno: `DB_PATH=/app/data/inventario.db`
-   *(Garantiza la persistencia permanente de la base de datos SQLite entre despliegues y reinicios).*
+   - Ruta (*Path*): `/api/health`
+   - Intervalo: `20s`
+   - Tiempo de espera: `5s`
+   - Retries: `5`
+
+6. **Almacenamiento Persistente (Storages / Persistent Volume)**:
+   - **Mount Path (Destino en contenedor)**: `/app/data`
+   - *(En el primer inicio, el sistema copia automáticamente la base de datos pre-cargada con el inventario UPS y los usuarios registrados a `/app/data/inventario.db`, manteniéndola protegida de forma permanente entre despliegues y reinicios).*
+
+7. **Variables de Entorno (Environment Variables)**:
+   ```env
+   APP_URL=https://mantencion.cfelbc.cl
+   DB_PATH=/app/data/inventario.db
+   PORT=8080
+   PYTHONUNBUFFERED=1
+   ```
 
 ---
 

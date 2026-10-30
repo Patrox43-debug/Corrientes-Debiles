@@ -53,6 +53,14 @@ def test_suite():
         assert "AppController" in js
         print("✓ Test 3: GET /js/app.js OK")
 
+    # 3.5 Test GET /api/health (Coolify Healthcheck)
+    with urllib.request.urlopen(f"{base_url}/api/health") as res:
+        assert res.status == 200
+        health = json.loads(res.read().decode('utf-8'))
+        assert health['status'] == "healthy"
+        assert health['database'] is True
+        print("✓ Test 3.5: GET /api/health OK -> Coolify Health:", health)
+
     # 4. Test GET /api/stats
     with urllib.request.urlopen(f"{base_url}/api/stats") as res:
         assert res.status == 200

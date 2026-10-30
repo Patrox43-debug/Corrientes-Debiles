@@ -15,6 +15,20 @@ except ImportError:
         from seed_data import SEED_EQUIPOS, SEED_MANTENCIONES
 
 DB_PATH = os.environ.get('DB_PATH', os.path.join(os.path.dirname(__file__), 'inventario.db'))
+DEFAULT_SEED_DB = os.path.join(os.path.dirname(__file__), 'inventario.db')
+
+# Si se usa un volumen persistente (ej. Coolify /app/data/inventario.db) y aún no existe la base de datos,
+# copiar la base de datos pre-cargada con el inventario y usuarios existentes
+if os.path.abspath(DB_PATH) != os.path.abspath(DEFAULT_SEED_DB) and not os.path.exists(DB_PATH) and os.path.exists(DEFAULT_SEED_DB):
+    try:
+        import shutil
+        db_dir = os.path.dirname(os.path.abspath(DB_PATH))
+        if db_dir and not os.path.exists(db_dir):
+            os.makedirs(db_dir, exist_ok=True)
+        shutil.copy2(DEFAULT_SEED_DB, DB_PATH)
+        print(f"[INFO] Base de datos pre-cargada copiada exitosamente a {DB_PATH}")
+    except Exception as e:
+        print(f"[WARN] No se pudo copiar la base inicial a {DB_PATH}: {e}")
 
 def get_connection():
     db_dir = os.path.dirname(os.path.abspath(DB_PATH))

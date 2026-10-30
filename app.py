@@ -127,7 +127,13 @@ class CustomRequestHandler(http.server.SimpleHTTPRequestHandler):
         if path.startswith('/api/'):
             # Health check
             if path == '/api/health':
-                return self.send_json({"status": "ok", "time": datetime.now().isoformat()})
+                return self.send_json({
+                    "status": "healthy",
+                    "app": "Corrientes Débiles",
+                    "domain": APP_URL,
+                    "database": os.path.exists(db.DB_PATH),
+                    "timestamp": datetime.now().isoformat()
+                })
 
             # Check initial setup status
             if path == '/api/setup/status':
